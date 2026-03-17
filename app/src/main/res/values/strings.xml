@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">FocusGuard</string>
+    <string name="accessibility_service_description">Used by FocusGuard to monitor foreground apps and enforce blocking rules.</string>
+</resources>

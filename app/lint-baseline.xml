@@ -1,0 +1,521 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.0.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.0.1)" variant="all" version="9.0.1">
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 22 (current min is 21): `android.content.Context#USAGE_STATS_SERVICE`"
+        errorLine1="            context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/example/focusguard/data/datasource/UsageStatsDataSource.kt"
+            line="14"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk = 34"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="13"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ProtectedPermissions"
+        message="Permission is only granted to system apps"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.PACKAGE_USAGE_STATS&quot;/>"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="5"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 9.0.1 is available: 9.1.0"
+        errorLine1="agp = &quot;9.0.1&quot;"
+        errorLine2="      ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/FocusGuard/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of `compileSdk` than 34 is available: 36"
+        errorLine1="    compileSdk = 34"
+        errorLine2="    ~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="8"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.13.1 is available: 1.18.0"
+        errorLine1="    implementation(&quot;androidx.core:core-ktx:1.13.1&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="45"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.appcompat:appcompat than 1.7.0 is available: 1.7.1"
+        errorLine1="    implementation(&quot;androidx.appcompat:appcompat:1.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="46"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.material:material than 1.12.0 is available: 1.13.0"
+        errorLine1="    implementation(&quot;com.google.android.material:material:1.12.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="47"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.activity:activity-compose than 1.9.0 is available: 1.13.0"
+        errorLine1="    implementation(&quot;androidx.activity:activity-compose:1.9.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="49"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose:compose-bom than 2024.06.00 is available: 2026.03.00"
+        errorLine1="    implementation(platform(&quot;androidx.compose:compose-bom:2024.06.00&quot;))"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="51"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-viewmodel-ktx than 2.7.0 is available: 2.10.0"
+        errorLine1="    implementation(&quot;androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="57"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.7.0 is available: 2.10.0"
+        errorLine1="    implementation(&quot;androidx.lifecycle:lifecycle-runtime-ktx:2.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="58"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-compose than 2.7.0 is available: 2.10.0"
+        errorLine1="    implementation(&quot;androidx.lifecycle:lifecycle-runtime-compose:2.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="62"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-compose than 2.7.7 is available: 2.9.7"
+        errorLine1="    implementation(&quot;androidx.navigation:navigation-compose:2.7.7&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="66"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose.material:material-icons-extended than 1.6.8 is available: 1.7.8"
+        errorLine1="    implementation(&quot;androidx.compose.material:material-icons-extended:1.6.8&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="67"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.17.0 is available: 1.18.0"
+        errorLine1="coreKtx = &quot;1.17.0&quot;"
+        errorLine2="          ~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/FocusGuard/gradle/libs.versions.toml"
+            line="4"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.activity:activity than 1.12.4 is available: 1.13.0"
+        errorLine1="activity = &quot;1.12.4&quot;"
+        errorLine2="           ~~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/FocusGuard/gradle/libs.versions.toml"
+            line="10"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-core than 1.7.3 is available: 1.10.2"
+        errorLine1="    implementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="59"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-android than 1.7.3 is available: 1.10.2"
+        errorLine1="    implementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="60"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlin.android than 2.0.0 is available: 2.3.10"
+        errorLine1="kotlin = &quot;2.0.0&quot;"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/FocusGuard/gradle/libs.versions.toml"
+            line="3"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.0.0 is available: 2.3.10"
+        errorLine1="kotlin = &quot;2.0.0&quot;"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="$HOME/AndroidStudioProjects/FocusGuard/gradle/libs.versions.toml"
+            line="3"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.layout.activity_main` appears to be unused"
+        errorLine1="&lt;androidx.constraintlayout.widget.ConstraintLayout xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/layout/activity_main.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.color.black` appears to be unused"
+        errorLine1="    &lt;color name=&quot;black&quot;>#FF000000&lt;/color>"
+        errorLine2="           ~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/colors.xml"
+            line="3"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.color.white` appears to be unused"
+        errorLine1="    &lt;color name=&quot;white&quot;>#FFFFFFFF&lt;/color>"
+        errorLine2="           ~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/colors.xml"
+            line="4"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        sharedPreferences.edit().putLong(packageName, limitMillis).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/focusguard/data/local/LimitManager.kt"
+            line="17"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        sharedPreferences.edit().remove(packageName).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/focusguard/data/local/LimitManager.kt"
+            line="27"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        sharedPreferences.edit().clear().apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/focusguard/data/local/LimitManager.kt"
+            line="49"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        sharedPreferences.edit()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/focusguard/data/local/SessionStorage.kt"
+            line="28"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        sharedPreferences.edit()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/focusguard/data/local/SessionStorage.kt"
+            line="47"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead (androidx.core:core-ktx is already available as `androidx-core-ktx`, but using version 1.17.0 instead)"
+        errorLine1="    implementation(&quot;androidx.core:core-ktx:1.13.1&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="45"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead (androidx.appcompat:appcompat is already available as `androidx-appcompat`, but using version 1.7.1 instead)"
+        errorLine1="    implementation(&quot;androidx.appcompat:appcompat:1.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="46"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead (com.google.android.material:material is already available as `material`, but using version 1.13.0 instead)"
+        errorLine1="    implementation(&quot;com.google.android.material:material:1.12.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="47"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.activity:activity-compose:1.9.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="49"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(platform(&quot;androidx.compose:compose-bom:2024.06.00&quot;))"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="51"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.compose.ui:ui&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="52"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.compose.ui:ui-tooling-preview&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="53"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.compose.foundation:foundation&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="54"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.compose.material3:material3&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="55"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="57"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.lifecycle:lifecycle-runtime-ktx:2.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="58"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="59"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="60"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.lifecycle:lifecycle-runtime-compose:2.7.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="62"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    debugImplementation(&quot;androidx.compose.ui:ui-tooling&quot;)"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="64"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.navigation:navigation-compose:2.7.7&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="66"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use version catalog instead"
+        errorLine1="    implementation(&quot;androidx.compose.material:material-icons-extended:1.6.8&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="67"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseTomlInstead"
+        message="Use the existing version catalog reference (`libs.junit`) instead"
+        errorLine1="    testImplementation(&quot;junit:junit:4.13.2&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="69"
+            column="24"/>
+    </issue>
+
+</issues>
