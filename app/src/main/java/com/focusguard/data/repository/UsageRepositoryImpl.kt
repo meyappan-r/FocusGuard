@@ -26,6 +26,6 @@ class UsageRepositoryImpl(
                 appName = appName,
                 usageTimeMillis = usageStats.totalTimeInForeground
             )
-        }.filter { it.usageTimeMillis > 0 } // Optimization to clean up list
+        }.filter { it.usageTimeMillis > 0 && it.packageName != context.packageName } // Clean up list & block loop
     }
 }

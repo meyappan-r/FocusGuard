@@ -15,6 +15,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -63,9 +64,17 @@ class MainActivity : ComponentActivity() {
             this, com.focusguard.ui.settings.SettingsViewModelFactory(this)
         )[com.focusguard.ui.settings.SettingsViewModel::class.java]
 
+        val startRoute = intent.getStringExtra("navigate_to") ?: Screen.Home.route
+
         setContent {
-            FocusGuardApp(homeViewModel, blocksViewModel, sessionsViewModel, settingsViewModel)
+            FocusGuardApp(homeViewModel, blocksViewModel, sessionsViewModel, settingsViewModel, startRoute)
         }
+    }
+
+    // Called when the app is already open & BlockActivity sends a new intent
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 }
 
@@ -74,11 +83,21 @@ fun FocusGuardApp(
     homeViewModel: HomeViewModel, 
     blocksViewModel: BlocksViewModel, 
     sessionsViewModel: com.focusguard.ui.sessions.SessionsViewModel,
-    settingsViewModel: com.focusguard.ui.settings.SettingsViewModel
+    settingsViewModel: com.focusguard.ui.settings.SettingsViewModel,
+    startRoute: String = Screen.Home.route
 ) {
     val navController = rememberNavController()
     val settingsState by settingsViewModel.state.collectAsState()
-    
+
+    // Navigate immediately to startRoute if it's not Home (e.g. coming from BlockActivity)
+    LaunchedEffect(startRoute) {
+        if (startRoute != Screen.Home.route) {
+            navController.navigate(startRoute) {
+                popUpTo(Screen.Home.route)
+                launchSingleTop = true
+            }
+        }
+    }
     val items = listOf(
         Screen.Home,
         Screen.Blocks,
