@@ -41,6 +41,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         // Never block FocusGuard itself
         if (packageName == this.packageName) return
 
+        // Never block safety-critical apps (dialer, SMS, contacts — emergency access)
+        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.NEVER_BLOCKABLE) return
+
         // ── 1. Session blocking ───────────────────────────────────────
         if (sessionStorage.isSessionActive()) {
             val endTime = sessionStorage.getActiveEndTimeMillis()

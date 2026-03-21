@@ -8,16 +8,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.focusguard.ui.home.formatTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +94,7 @@ fun BlockAppRow(
     onEditClick: () -> Unit,
     onToggleBlock: () -> Unit
 ) {
+    val isBlockable = appState.appUsage.isBlockable
     val isLimited = appState.limitMillis > 0
     val usageTime = appState.appUsage.usageTimeMillis
     val percentage = if (isLimited && appState.limitMillis > 0) {
@@ -122,29 +125,66 @@ fun BlockAppRow(
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.width(16.dp))
-                
+
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = appState.appUsage.appName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = appState.appUsage.appName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (!isBlockable) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            // Shield badge — emergency/essential app
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shield,
+                                        contentDescription = "Protected",
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = "Protected",
+                                        fontSize = 9.sp,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
                     Text(
                         text = "Used: ${formatTime(usageTime)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (!isBlockable) {
+                        Text(
+                            text = "Cannot be blocked — emergency access",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
                 }
-                
+
                 Switch(
                     checked = isLimited,
-                    onCheckedChange = { onToggleBlock() }
+                    onCheckedChange = { if (isBlockable) onToggleBlock() },
+                    enabled = isBlockable
                 )
             }
-            
-            if (isLimited) {
+
+            if (isLimited && isBlockable) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -176,9 +216,9 @@ fun BlockAppRow(
                             color = if (percentage >= 1f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.width(16.dp))
-                    
+
                     IconButton(onClick = onEditClick) {
                         Icon(
                             imageVector = Icons.Default.Edit,
