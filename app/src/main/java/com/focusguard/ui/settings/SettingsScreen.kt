@@ -28,7 +28,11 @@ import com.focusguard.ui.extensions.clickableScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, isDarkMode: Boolean = false) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel, 
+    isDarkMode: Boolean = false,
+    onNavigateToPrivacy: () -> Unit
+) {
     val state   by viewModel.state.collectAsState()
     val context  = LocalContext.current
 
@@ -121,6 +125,34 @@ fun SettingsScreen(viewModel: SettingsViewModel, isDarkMode: Boolean = false) {
                 }
             }
 
+            // ── Appearance ───────────────────────────────────────
+            item { Spacer(Modifier.height(20.dp)) }
+            item { SectionLabel("APPEARANCE", txtSec) }
+            item {
+                SettingsCard(cardBg = cardBg) {
+                    ThemeOptionRow(
+                        title = "System Default",
+                        selected = state.themeMode == ThemeMode.SYSTEM,
+                        txtPri = txtPri,
+                        onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) }
+                    )
+                    HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                    ThemeOptionRow(
+                        title = "Light Mode",
+                        selected = state.themeMode == ThemeMode.LIGHT,
+                        txtPri = txtPri,
+                        onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) }
+                    )
+                    HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                    ThemeOptionRow(
+                        title = "Dark Mode",
+                        selected = state.themeMode == ThemeMode.DARK,
+                        txtPri = txtPri,
+                        onClick = { viewModel.setThemeMode(ThemeMode.DARK) }
+                    )
+                }
+            }
+
             // ── About ─────────────────────────────────────────────
             item { Spacer(Modifier.height(20.dp)) }
             item { SectionLabel("ABOUT", txtSec) }
@@ -159,7 +191,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, isDarkMode: Boolean = false) {
                         subtitle = "Read how we protect your data.",
                         txtPri   = txtPri,
                         txtSec   = txtSec,
-                        onClick  = { /* Navigate to privacy URL */ }
+                        onClick  = onNavigateToPrivacy
                     )
                 }
             }
@@ -229,6 +261,30 @@ private fun PermissionRow(
             Text("Granted", fontSize = 12.sp,
                 color = FG_Seg1, fontWeight = FontWeight.Medium)
         }
+    }
+}
+
+@Composable
+private fun ThemeOptionRow(
+    title: String,
+    selected: Boolean,
+    txtPri: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.material3.RadioButton(
+            selected = selected,
+            onClick = onClick,
+            colors = androidx.compose.material3.RadioButtonDefaults.colors(selectedColor = FG_Seg1)
+        )
+        Spacer(Modifier.width(14.dp))
+        Text(title, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = txtPri)
     }
 }
 

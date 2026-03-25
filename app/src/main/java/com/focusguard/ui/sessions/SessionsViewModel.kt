@@ -75,7 +75,8 @@ data class SessionsState(
 )
 
 class SessionsViewModel(
-    private val sessionStorage: SessionStorage
+    private val sessionStorage: SessionStorage,
+    private val sessionScheduler: com.focusguard.core.scheduling.SessionScheduler
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SessionsState())
@@ -100,12 +101,15 @@ class SessionsViewModel(
         if (idx >= 0) current[idx] = session else current.add(session)
         sessionStorage.saveSessions(current)
         _state.value = _state.value.copy(sessions = current.toList())
+        sessionScheduler.scheduleSession(session)
     }
 
     fun deleteSession(id: String) {
+        val sessionToDelete = sessionStorage.getSessions().find { it.id == id }
         val updated = sessionStorage.getSessions().filter { it.id != id }
         sessionStorage.saveSessions(updated)
         _state.value = _state.value.copy(sessions = updated)
+        sessionToDelete?.let { sessionScheduler.cancelSession(it) }
     }
 
     fun newSessionFromSuggested(s: SuggestedSession): FocusSession = FocusSession(

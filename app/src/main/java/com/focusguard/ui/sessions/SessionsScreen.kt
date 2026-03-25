@@ -122,10 +122,10 @@ fun SessionsMainScreen(
     onStartSession: (FocusSession) -> Unit
 ) {
     val sessionsForDay = viewModel.sessionsForSelectedDate()
-    val bg    = FGColors.bg(isDarkMode)
-    val hdrBg = FGColors.header(isDarkMode)
-    val txtPri = FGColors.txtPri(isDarkMode)
-    val txtSec = FGColors.txtSec(isDarkMode)
+    val bg    = MaterialTheme.colorScheme.background
+    val hdrBg = MaterialTheme.colorScheme.surface
+    val txtPri = MaterialTheme.colorScheme.onSurface
+    val txtSec = MaterialTheme.colorScheme.onSurfaceVariant
 
     Scaffold(
         containerColor = bg,
@@ -180,7 +180,7 @@ fun SessionsMainScreen(
             if (sessionsForDay.isNotEmpty()) {
                 item {
                     Text("Today's Sessions", fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp, color = FGColors.txtPri(isDarkMode),
+                        fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 8.dp))
                 }
                 items(sessionsForDay) { s ->
@@ -206,7 +206,7 @@ fun SessionsMainScreen(
             if (state.sessions.any { it !in sessionsForDay }) {
                 item {
                     Text("My Sessions", fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp, color = FGColors.txtPri(isDarkMode),
+                        fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 8.dp))
                 }
                 items(state.sessions.filter { it !in sessionsForDay }) { s ->
@@ -229,8 +229,8 @@ fun CalendarWeekStrip(state: SessionsState, viewModel: SessionsViewModel, isDark
     val today     = LocalDate.now()
     val weekStart = today.minusDays(today.dayOfWeek.value.toLong() - 1)
         .plusWeeks(state.weekOffset.toLong())
-    val txtPri = FGColors.txtPri(isDarkMode)
-    val txtSec = FGColors.txtSec(isDarkMode)
+    val txtPri = MaterialTheme.colorScheme.onSurface
+    val txtSec = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column {
         Row(
@@ -312,9 +312,9 @@ fun ActiveSessionCard(
     val m  = ((remainingMillis % 3_600_000) / 60_000).toInt()
     val s  = ((remainingMillis % 60_000) / 1_000).toInt()
     val timeStr = if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
-    val cardBg  = FGColors.card(isDarkMode)
-    val txtPri  = FGColors.txtPri(isDarkMode)
-    val txtSec  = FGColors.txtSec(isDarkMode)
+    val cardBg  = MaterialTheme.colorScheme.surfaceVariant
+    val txtPri  = MaterialTheme.colorScheme.onSurface
+    val txtSec  = MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
         modifier  = Modifier.fillMaxWidth(),
@@ -338,7 +338,7 @@ fun ActiveSessionCard(
                     modifier    = Modifier.size(48.dp),
                     strokeWidth = 5.dp,
                     color       = FG_Seg1,
-                    trackColor  = FGColors.track(isDarkMode)
+                    trackColor  = MaterialTheme.colorScheme.outlineVariant
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
@@ -369,10 +369,10 @@ fun ActiveSessionCard(
 // ─────────────────────────────────────────────────────────────────
 @Composable
 fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd: () -> Unit, onStart: () -> Unit) {
-    val cardBg = FGColors.card(isDarkMode)
-    val surfBg = FGColors.surf(isDarkMode)
-    val txtPri = FGColors.txtPri(isDarkMode)
-    val txtSec = FGColors.txtSec(isDarkMode)
+    val cardBg = MaterialTheme.colorScheme.surfaceVariant
+    val surfBg = MaterialTheme.colorScheme.surface
+    val txtPri = MaterialTheme.colorScheme.onSurface
+    val txtSec = MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
         modifier  = Modifier.fillMaxWidth().clickableScale { onAdd() },
@@ -421,10 +421,10 @@ fun SavedSessionCard(
     onEdit: () -> Unit,
     onStart: () -> Unit
 ) {
-    val cardBg = FGColors.card(isDarkMode)
-    val surfBg = FGColors.surf(isDarkMode)
-    val txtPri = FGColors.txtPri(isDarkMode)
-    val txtSec = FGColors.txtSec(isDarkMode)
+    val cardBg = MaterialTheme.colorScheme.surfaceVariant
+    val surfBg = MaterialTheme.colorScheme.surface
+    val txtPri = MaterialTheme.colorScheme.onSurface
+    val txtSec = MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
         modifier  = Modifier.fillMaxWidth().clickableScale { onEdit() },
@@ -634,7 +634,7 @@ fun CreateSessionScreen(
             // ── Name + emoji row
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape    = RoundedCornerShape(12.dp)
             ) {
                 Row(modifier = Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -788,7 +788,7 @@ fun CreateSessionScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Card(
                 modifier = Modifier.clickable { onPickApps(buildSession()) },
-                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape    = RoundedCornerShape(12.dp)
             ) {
                 Row(
@@ -858,13 +858,13 @@ fun AppPickerScreen(
     var query   by remember { mutableStateOf("") }
     var snackMsg by remember { mutableStateOf<String?>(null) }
 
-    val bg     = FGColors.bg(isDarkMode)
-    val hdrBg  = FGColors.header(isDarkMode)
-    val cardBg = FGColors.card(isDarkMode)
-    val surfBg = FGColors.surf(isDarkMode)
-    val txtPri = FGColors.txtPri(isDarkMode)
-    val txtSec = FGColors.txtSec(isDarkMode)
-    val track  = FGColors.track(isDarkMode)
+    val bg     = MaterialTheme.colorScheme.background
+    val hdrBg  = MaterialTheme.colorScheme.surface
+    val cardBg = MaterialTheme.colorScheme.surfaceVariant
+    val surfBg = MaterialTheme.colorScheme.surface
+    val txtPri = MaterialTheme.colorScheme.onSurface
+    val txtSec = MaterialTheme.colorScheme.onSurfaceVariant
+    val track  = MaterialTheme.colorScheme.outlineVariant
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -905,7 +905,7 @@ fun AppPickerScreen(
                 modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 colors        = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor   = FG_Seg1,
-                    unfocusedBorderColor = FGColors.track(isDarkMode)
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
 

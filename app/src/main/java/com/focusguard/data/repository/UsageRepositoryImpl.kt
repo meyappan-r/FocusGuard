@@ -41,13 +41,16 @@ class UsageRepositoryImpl(
 
     fun getDailyUsage(): List<AppUsage> {
         val packageManager = context.packageManager
-        return dataSource.getTodayUsage()
-            .filter { it.packageName !in ALWAYS_HIDDEN
-                    && !it.packageName.startsWith("com.android.server")
-                    && it.packageName != context.packageName }
-            .groupBy { it.packageName }
-            .map { (packageName, stats) ->
-                val totalTime = stats.sumOf { it.totalTimeInForeground }
+        val end = System.currentTimeMillis()
+        val start = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -1)
+        }.timeInMillis
+
+        return dataSource.getSotByPackage(start, end)
+            .filter { it.key !in ALWAYS_HIDDEN
+                    && !it.key.startsWith("com.android.server")
+                    && it.key != context.packageName }
+            .map { (packageName, totalTime) ->
                 val appName = try {
                     val info = packageManager.getApplicationInfo(packageName, 0)
                     packageManager.getApplicationLabel(info).toString()
@@ -75,13 +78,17 @@ class UsageRepositoryImpl(
                 set(Calendar.SECOND, 0);      set(Calendar.MILLISECOND, 0)
                 add(Calendar.DAY_OF_YEAR, -offset)
             }
+            val start = cal.timeInMillis
             val dayLabel = dayFormat.format(cal.time)
+            
+            cal.add(Calendar.DAY_OF_YEAR, 1)
+            val end = minOf(cal.timeInMillis, System.currentTimeMillis())
 
-            val total = dataSource.getDayUsage(offset)
-                .filter { it.packageName !in ALWAYS_HIDDEN
-                        && !it.packageName.startsWith("com.android.server")
-                        && it.packageName != context.packageName }
-                .sumOf { it.totalTimeInForeground }
+            val total = dataSource.getSotByPackage(start, end)
+                .filter { it.key !in ALWAYS_HIDDEN
+                        && !it.key.startsWith("com.android.server")
+                        && it.key != context.packageName }
+                .values.sum()
 
             WeeklyDayUsage(
                 dayLabel   = dayLabel,
@@ -97,14 +104,22 @@ class UsageRepositoryImpl(
      */
     fun getDayAppUsage(dayOffset: Int): List<AppUsage> {
         val packageManager = context.packageManager
-        return dataSource.getDayUsage(dayOffset)
-            .filter { it.packageName !in ALWAYS_HIDDEN
-                    && !it.packageName.startsWith("com.android.server")
-                    && it.packageName != context.packageName
-                    && it.totalTimeInForeground > 0 }
-            .groupBy { it.packageName }
-            .map { (packageName, stats) ->
-                val totalTime = stats.sumOf { it.totalTimeInForeground }
+        
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0);      set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, -dayOffset)
+        }
+        val start = cal.timeInMillis
+        cal.add(Calendar.DAY_OF_YEAR, 1)
+        val end = minOf(cal.timeInMillis, System.currentTimeMillis())
+
+        return dataSource.getSotByPackage(start, end)
+            .filter { it.key !in ALWAYS_HIDDEN
+                    && !it.key.startsWith("com.android.server")
+                    && it.key != context.packageName
+                    && it.value > 0 }
+            .map { (packageName, totalTime) ->
                 val appName = try {
                     val info = packageManager.getApplicationInfo(packageName, 0)
                     packageManager.getApplicationLabel(info).toString()

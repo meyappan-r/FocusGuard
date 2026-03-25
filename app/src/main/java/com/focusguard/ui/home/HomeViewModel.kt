@@ -62,9 +62,10 @@ class HomeViewModel(
             val peak = sorted.firstOrNull()?.let {
                 PeakDistraction(appName = it.appName, usageTime = it.usageTimeMillis)
             }
+            val appUsageList = if (sorted.isNotEmpty()) sorted.drop(1) else sorted
 
             _state.value = _state.value.copy(
-                appUsage          = sorted,
+                appUsage          = appUsageList,
                 screenTimeSummary = ScreenTimeSummary(totalScreenTime = totalTime),
                 peakDistraction   = peak,
                 ringSegments      = ringSegments

@@ -9,11 +9,13 @@ import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 data class SettingsState(
     val hasUsageStatsPermission: Boolean = false,
     val hasAccessibilityPermission: Boolean = false,
     val isBlockingEnabled: Boolean = true,
-    val isDarkMode: Boolean = false
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 class SettingsViewModel(private val context: Context) : ViewModel() {
@@ -23,10 +25,11 @@ class SettingsViewModel(private val context: Context) : ViewModel() {
     private val prefs = context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
 
     init {
-        val savedDarkMode = prefs.getBoolean("dark_mode", false)
+        val savedThemeName = prefs.getString("theme_mode", ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
+        val savedTheme = runCatching { ThemeMode.valueOf(savedThemeName) }.getOrDefault(ThemeMode.SYSTEM)
         val savedBlocking = prefs.getBoolean("blocking_enabled", true)
         _state.value = _state.value.copy(
-            isDarkMode = savedDarkMode,
+            themeMode = savedTheme,
             isBlockingEnabled = savedBlocking
         )
         checkPermissions()
@@ -90,9 +93,9 @@ class SettingsViewModel(private val context: Context) : ViewModel() {
         _state.value = _state.value.copy(isBlockingEnabled = enabled)
     }
 
-    fun toggleDarkMode(enabled: Boolean) {
-        prefs.edit().putBoolean("dark_mode", enabled).apply()
-        _state.value = _state.value.copy(isDarkMode = enabled)
+    fun setThemeMode(mode: ThemeMode) {
+        prefs.edit().putString("theme_mode", mode.name).apply()
+        _state.value = _state.value.copy(themeMode = mode)
     }
     
     fun requestUsageStatsPermission(context: Context) {

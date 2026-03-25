@@ -72,7 +72,8 @@ class MainActivity : ComponentActivity() {
         val blocksViewModel  = BlocksViewModel(useCase, limitManager)
 
         val sessionStorage   = SessionStorage(this)
-        val sessionsViewModel = com.focusguard.ui.sessions.SessionsViewModel(sessionStorage)
+        val sessionScheduler = com.focusguard.core.scheduling.SessionScheduler(this)
+        val sessionsViewModel = com.focusguard.ui.sessions.SessionsViewModel(sessionStorage, sessionScheduler)
 
         val settingsViewModel = androidx.lifecycle.ViewModelProvider(
             this, com.focusguard.ui.settings.SettingsViewModelFactory(this)
@@ -107,7 +108,12 @@ fun FocusGuardApp(
 ) {
     val navController   = rememberNavController()
     val settingsState   by settingsViewModel.state.collectAsState()
-    val isDarkMode      = settingsState.isDarkMode
+    val systemDarkMode  = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDarkMode      = when (settingsState.themeMode) {
+        com.focusguard.ui.settings.ThemeMode.LIGHT -> false
+        com.focusguard.ui.settings.ThemeMode.DARK -> true
+        com.focusguard.ui.settings.ThemeMode.SYSTEM -> systemDarkMode
+    }
 
     LaunchedEffect(startRoute) {
         if (startRoute != Screen.Home.route) {
@@ -210,12 +216,24 @@ fun FocusGuardApp(
                     HomeScreen(
                         viewModel     = homeViewModel,
                         isDarkMode    = isDarkMode,
-                        onThemeToggle = { settingsViewModel.toggleDarkMode(!isDarkMode) }
+                        onThemeToggle = { /* handled in settings */ }
                     )
                 }
                 composable(Screen.Blocks.route)   { BlocksScreen(blocksViewModel, isDarkMode) }
                 composable(Screen.Sessions.route) { SessionsScreen(sessionsViewModel, isDarkMode) }
-                composable(Screen.Settings.route) { SettingsScreen(settingsViewModel, isDarkMode) }
+                composable(Screen.Settings.route) { 
+                    SettingsScreen(
+                        viewModel = settingsViewModel, 
+                        isDarkMode = isDarkMode,
+                        onNavigateToPrivacy = { navController.navigate("privacy") }
+                    ) 
+                }
+                composable("privacy") { 
+                    com.focusguard.ui.settings.PrivacyScreen(
+                        onBack = { navController.popBackStack() },
+                        isDarkMode = isDarkMode
+                    ) 
+                }
             }
         }
     }
