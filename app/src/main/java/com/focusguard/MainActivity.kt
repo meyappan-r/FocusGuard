@@ -28,6 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.focusguard.data.datasource.UsageStatsDataSource
 import com.focusguard.data.local.LimitManager
+import com.focusguard.data.local.SessionStorage
 import com.focusguard.data.repository.UsageRepositoryImpl
 import com.focusguard.domain.usecase.GetDailyUsageUseCase
 import com.focusguard.ui.blocks.BlocksScreen
@@ -36,10 +37,14 @@ import com.focusguard.ui.home.HomeScreen
 import com.focusguard.ui.home.HomeViewModel
 import com.focusguard.ui.sessions.SessionsScreen
 import com.focusguard.ui.settings.SettingsScreen
+import com.focusguard.ui.theme.FGColors
+import com.focusguard.ui.theme.FG_Seg0
+import com.focusguard.ui.theme.FG_Seg1
+import androidx.compose.material3.NavigationBarItemDefaults
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
-    object Home : Screen("home", "Home", Icons.Filled.Home)
-    object Blocks : Screen("blocks", "Blocks", Icons.Filled.Block)
+    object Home     : Screen("home",     "Home",     Icons.Filled.Home)
+    object Blocks   : Screen("blocks",   "Blocks",   Icons.Filled.Block)
     object Sessions : Screen("sessions", "Sessions", Icons.Filled.Timer)
     object Settings : Screen("settings", "Settings", Icons.Filled.Settings)
 }
@@ -49,17 +54,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val dataSource = UsageStatsDataSource(this)
-        val repository = UsageRepositoryImpl(this, dataSource)
-        val useCase = GetDailyUsageUseCase(repository)
+        val dataSource   = UsageStatsDataSource(this)
+        val repository   = UsageRepositoryImpl(this, dataSource)
+        val useCase      = GetDailyUsageUseCase(repository)
         val limitManager = LimitManager(this)
-        
-        val homeViewModel = HomeViewModel(useCase)
-        val blocksViewModel = BlocksViewModel(useCase, limitManager)
-        
-        val sessionStorage = com.focusguard.data.local.SessionStorage(this)
+
+        // HomeViewModel now takes the repository too (for weekly data)
+        val homeViewModel    = HomeViewModel(useCase, repository)
+        val blocksViewModel  = BlocksViewModel(useCase, limitManager)
+
+        val sessionStorage   = SessionStorage(this)
         val sessionsViewModel = com.focusguard.ui.sessions.SessionsViewModel(sessionStorage)
-        
+
         val settingsViewModel = androidx.lifecycle.ViewModelProvider(
             this, com.focusguard.ui.settings.SettingsViewModelFactory(this)
         )[com.focusguard.ui.settings.SettingsViewModel::class.java]
@@ -67,11 +73,16 @@ class MainActivity : ComponentActivity() {
         val startRoute = intent.getStringExtra("navigate_to") ?: Screen.Home.route
 
         setContent {
-            FocusGuardApp(homeViewModel, blocksViewModel, sessionsViewModel, settingsViewModel, startRoute)
+            FocusGuardApp(
+                homeViewModel     = homeViewModel,
+                blocksViewModel   = blocksViewModel,
+                sessionsViewModel = sessionsViewModel,
+                settingsViewModel = settingsViewModel,
+                startRoute        = startRoute
+            )
         }
     }
 
-    // Called when the app is already open & BlockActivity sends a new intent
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -80,16 +91,16 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun FocusGuardApp(
-    homeViewModel: HomeViewModel, 
-    blocksViewModel: BlocksViewModel, 
+    homeViewModel: HomeViewModel,
+    blocksViewModel: BlocksViewModel,
     sessionsViewModel: com.focusguard.ui.sessions.SessionsViewModel,
     settingsViewModel: com.focusguard.ui.settings.SettingsViewModel,
     startRoute: String = Screen.Home.route
 ) {
-    val navController = rememberNavController()
-    val settingsState by settingsViewModel.state.collectAsState()
+    val navController   = rememberNavController()
+    val settingsState   by settingsViewModel.state.collectAsState()
+    val isDarkMode      = settingsState.isDarkMode
 
-    // Navigate immediately to startRoute if it's not Home (e.g. coming from BlockActivity)
     LaunchedEffect(startRoute) {
         if (startRoute != Screen.Home.route) {
             navController.navigate(startRoute) {
@@ -98,33 +109,45 @@ fun FocusGuardApp(
             }
         }
     }
-    val items = listOf(
-        Screen.Home,
-        Screen.Blocks,
-        Screen.Sessions,
-        Screen.Settings
-    )
+
+    val items = listOf(Screen.Home, Screen.Blocks, Screen.Sessions, Screen.Settings)
+
+    val bg     = FGColors.header(isDarkMode)
+    val txtSec = FGColors.txtSec(isDarkMode)
 
     androidx.compose.material3.MaterialTheme(
-        colorScheme = if (settingsState.isDarkMode) androidx.compose.material3.darkColorScheme() else androidx.compose.material3.lightColorScheme()
+        colorScheme = if (isDarkMode)
+            androidx.compose.material3.darkColorScheme()
+        else
+            androidx.compose.material3.lightColorScheme()
     ) {
         Scaffold(
             bottomBar = {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = bg,
+                    contentColor = txtSec
+                ) {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
                     items.forEach { screen ->
                         NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.title) },
-                            label = { Text(screen.title) },
+                            icon     = { Icon(screen.icon, contentDescription = screen.title) },
+                            label    = { Text(screen.title) },
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                            onClick = {
+                            colors   = NavigationBarItemDefaults.colors(
+                                selectedIconColor = FG_Seg0,
+                                selectedTextColor = FG_Seg0,
+                                indicatorColor    = FG_Seg1.copy(alpha = 0.2f),
+                                unselectedIconColor = txtSec,
+                                unselectedTextColor = txtSec
+                            ),
+                            onClick  = {
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
                                     launchSingleTop = true
-                                    restoreState = true
+                                    restoreState    = true
                                 }
                             }
                         )
@@ -132,11 +155,21 @@ fun FocusGuardApp(
                 }
             }
         ) { innerPadding ->
-            NavHost(navController, startDestination = Screen.Home.route, Modifier.padding(innerPadding)) {
-                composable(Screen.Home.route) { HomeScreen(homeViewModel) }
-                composable(Screen.Blocks.route) { BlocksScreen(blocksViewModel) }
-                composable(Screen.Sessions.route) { SessionsScreen(sessionsViewModel) }
-                composable(Screen.Settings.route) { com.focusguard.ui.settings.SettingsScreen(settingsViewModel) }
+            NavHost(
+                navController    = navController,
+                startDestination = Screen.Home.route,
+                modifier         = Modifier.padding(innerPadding)
+            ) {
+                composable(Screen.Home.route) {
+                    HomeScreen(
+                        viewModel     = homeViewModel,
+                        isDarkMode    = isDarkMode,
+                        onThemeToggle = { settingsViewModel.toggleDarkMode(!isDarkMode) }
+                    )
+                }
+                composable(Screen.Blocks.route)   { BlocksScreen(blocksViewModel, isDarkMode) }
+                composable(Screen.Sessions.route) { SessionsScreen(sessionsViewModel, isDarkMode) }
+                composable(Screen.Settings.route) { SettingsScreen(settingsViewModel, isDarkMode) }
             }
         }
     }

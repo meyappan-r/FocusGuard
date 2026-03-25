@@ -1,46 +1,67 @@
 package com.focusguard.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.focusguard.ui.theme.FGColors
+import com.focusguard.ui.theme.FG_Error
+import com.focusguard.ui.theme.FG_Seg0
+import com.focusguard.ui.theme.FG_Seg1
+import com.focusguard.ui.theme.FG_Seg2
+import com.focusguard.ui.theme.FG_Seg3
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
-    val state by viewModel.state.collectAsState()
-    val context = LocalContext.current
+fun SettingsScreen(viewModel: SettingsViewModel, isDarkMode: Boolean = false) {
+    val state   by viewModel.state.collectAsState()
+    val context  = LocalContext.current
 
-    // Observe permission changes when resuming the screen
+    val bg      = FGColors.bg(isDarkMode)
+    val hdrBg   = FGColors.header(isDarkMode)
+    val cardBg  = FGColors.card(isDarkMode)
+    val surfBg  = FGColors.surf(isDarkMode)
+    val txtPri  = FGColors.txtPri(isDarkMode)
+    val txtSec  = FGColors.txtSec(isDarkMode)
+
     DisposableEffect(context) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME)
                 viewModel.checkPermissions()
-            }
         }
         val lifecycle = (context as androidx.activity.ComponentActivity).lifecycle
         lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
+        containerColor = bg,
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Shield, contentDescription = null,
+                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("FocusGuard", fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp, color = txtPri)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = hdrBg)
             )
         }
     ) { padding ->
@@ -48,141 +69,226 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+            // ── Permissions ─────────────────────────────────────
             item {
-                SettingsSectionTitle("Permissions")
+                SectionLabel("PERMISSIONS", txtSec)
+            }
+            item {
+                SettingsCard(cardBg = cardBg) {
+                    PermissionRow(
+                        icon      = if (state.hasUsageStatsPermission) Icons.Default.CheckCircle else Icons.Default.Lock,
+                        iconTint  = if (state.hasUsageStatsPermission) FG_Seg1 else FG_Error,
+                        title     = "Usage Access",
+                        subtitle  = "Required to track screen time.",
+                        isGranted = state.hasUsageStatsPermission,
+                        txtPri    = txtPri,
+                        txtSec    = txtSec,
+                        onClick   = { viewModel.requestUsageStatsPermission(context) }
+                    )
+                    HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                    PermissionRow(
+                        icon      = if (state.hasAccessibilityPermission) Icons.Default.CheckCircle else Icons.Default.Lock,
+                        iconTint  = if (state.hasAccessibilityPermission) FG_Seg1 else FG_Error,
+                        title     = "Accessibility Service",
+                        subtitle  = "Required to enforce app limits.",
+                        isGranted = state.hasAccessibilityPermission,
+                        txtPri    = txtPri,
+                        txtSec    = txtSec,
+                        onClick   = { viewModel.requestAccessibilityPermission(context) }
+                    )
+                }
             }
 
+            // ── Preferences ──────────────────────────────────────
+            item { Spacer(Modifier.height(20.dp)) }
+            item { SectionLabel("PREFERENCES", txtSec) }
             item {
-                PermissionItem(
-                    title = "Usage Access",
-                    description = "Required to track screen time accurately.",
-                    isGranted = state.hasUsageStatsPermission,
-                    onClick = { viewModel.requestUsageStatsPermission(context) }
-                )
+                SettingsCard(cardBg = cardBg) {
+                    ToggleRow(
+                        icon     = Icons.Default.Block,
+                        title    = "Enable App Blocking",
+                        subtitle = "Pause all limits temporarily.",
+                        checked  = state.isBlockingEnabled,
+                        txtPri   = txtPri,
+                        txtSec   = txtSec,
+                        onToggle = { viewModel.toggleBlocking(it) }
+                    )
+                }
             }
 
+            // ── About ─────────────────────────────────────────────
+            item { Spacer(Modifier.height(20.dp)) }
+            item { SectionLabel("ABOUT", txtSec) }
             item {
-                PermissionItem(
-                    title = "Accessibility Service",
-                    description = "Required to enforce app limits locally.",
-                    isGranted = state.hasAccessibilityPermission,
-                    onClick = { viewModel.requestAccessibilityPermission(context) }
-                )
+                SettingsCard(cardBg = cardBg) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null,
+                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Version", fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp, color = txtPri)
+                            Text("1.0.0 (MVP)", fontSize = 12.sp, color = txtSec)
+                        }
+                    }
+                    HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                    ActionRow(
+                        icon     = Icons.Default.SystemUpdate,
+                        title    = "Check for Updates",
+                        subtitle = "You are up to date.",
+                        txtPri   = txtPri,
+                        txtSec   = txtSec,
+                        onClick  = { /* Handle update check */ }
+                    )
+                    HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                    ActionRow(
+                        icon     = Icons.Default.PrivacyTip,
+                        title    = "Privacy Statement",
+                        subtitle = "Read how we protect your data.",
+                        txtPri   = txtPri,
+                        txtSec   = txtSec,
+                        onClick  = { /* Navigate to privacy URL */ }
+                    )
+                }
             }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
 
-            item {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                SettingsSectionTitle("Preferences")
-            }
+// ── Shared sub-composables ────────────────────────────────────────
 
-            item {
-                SettingsSwitchItem(
-                    icon = Icons.Default.Block,
-                    title = "Enable App Blocking",
-                    description = "Toggle to temporarily pause all limits.",
-                    isChecked = state.isBlockingEnabled,
-                    onCheckedChange = { viewModel.toggleBlocking(it) }
-                )
-            }
+@Composable
+private fun SectionLabel(text: String, color: Color) {
+    Text(
+        text          = text,
+        fontSize      = 11.sp,
+        fontWeight    = FontWeight.SemiBold,
+        color         = color,
+        letterSpacing = 1.4.sp,
+        modifier      = Modifier.padding(vertical = 8.dp)
+    )
+}
 
-            item {
-                SettingsSwitchItem(
-                    icon = Icons.Default.DarkMode,
-                    title = "Dark Mode",
-                    description = "Change the application theme.",
-                    isChecked = state.isDarkMode,
-                    onCheckedChange = { viewModel.toggleDarkMode(it) }
-                )
+@Composable
+private fun SettingsCard(cardBg: Color, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = cardBg),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun PermissionRow(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    isGranted: Boolean,
+    txtPri: Color,
+    txtSec: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(!isGranted) { onClick() }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint,
+            modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium,
+                fontSize = 14.sp, color = txtPri)
+            Text(subtitle, fontSize = 12.sp, color = txtSec)
+        }
+        if (!isGranted) {
+            TextButton(onClick = onClick,
+                colors = ButtonDefaults.textButtonColors(contentColor = FG_Seg1)) {
+                Text("Grant", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
-            
-            item {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                SettingsSectionTitle("About")
-                
-                SettingsActionItem(
-                    icon = Icons.Default.Info,
-                    title = "Version",
-                    subtitle = "1.0.0 (MVP)"
-                ) {}
-            }
+        } else {
+            Text("Granted", fontSize = 12.sp,
+                color = FG_Seg1, fontWeight = FontWeight.Medium)
         }
     }
 }
 
 @Composable
-fun SettingsSectionTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-    )
-}
-
-@Composable
-fun PermissionItem(
-    title: String,
-    description: String,
-    isGranted: Boolean,
-    onClick: () -> Unit
-) {
-    ListItem(
-        modifier = Modifier.clickable(!isGranted) { onClick() },
-        headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
-        leadingContent = {
-            Icon(
-                imageVector = if (isGranted) Icons.Default.CheckCircle else Icons.Default.Warning,
-                contentDescription = null,
-                tint = if (isGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-            )
-        },
-        trailingContent = {
-            if (!isGranted) {
-                TextButton(onClick = onClick) {
-                    Text("Grant")
-                }
-            } else {
-                Text("Granted", color = MaterialTheme.colorScheme.primary)
-            }
-        }
-    )
-}
-
-@Composable
-fun SettingsSwitchItem(
+private fun ToggleRow(
     icon: ImageVector,
     title: String,
-    description: String,
-    isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    subtitle: String,
+    checked: Boolean,
+    txtPri: Color,
+    txtSec: Color,
+    onToggle: (Boolean) -> Unit
 ) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
-        leadingContent = { Icon(icon, contentDescription = null) },
-        trailingContent = {
-            Switch(
-                checked = isChecked,
-                onCheckedChange = onCheckedChange
-            )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = FG_Seg1,
+            modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium,
+                fontSize = 14.sp, color = txtPri)
+            Text(subtitle, fontSize = 12.sp, color = txtSec)
         }
-    )
+        Switch(
+            checked         = checked,
+            onCheckedChange = onToggle,
+            colors          = SwitchDefaults.colors(
+                checkedThumbColor  = FG_Seg1,
+                checkedTrackColor  = FG_Seg3.copy(alpha = 0.4f)
+            )
+        )
+    }
 }
 
 @Composable
-fun SettingsActionItem(
+private fun ActionRow(
     icon: ImageVector,
     title: String,
-    subtitle: String? = null,
+    subtitle: String,
+    txtPri: Color,
+    txtSec: Color,
     onClick: () -> Unit
 ) {
-    ListItem(
-        modifier = Modifier.clickable { onClick() },
-        headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { { Text(it) } },
-        leadingContent = { Icon(icon, contentDescription = null) }
-    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = FG_Seg1,
+            modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium,
+                fontSize = 14.sp, color = txtPri)
+            Text(subtitle, fontSize = 12.sp, color = txtSec)
+        }
+    }
 }

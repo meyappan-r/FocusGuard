@@ -18,6 +18,11 @@ class BlockerAccessibilityService : AccessibilityService() {
     private lateinit var sessionStorage: SessionStorage
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // Debounce: skip duplicate events for the same package within 1 second
+    private var lastPackage: String = ""
+    private var lastEventTime: Long = 0L
+    private val DEBOUNCE_MS = 1_000L
+
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -29,8 +34,15 @@ class BlockerAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val packageName = event.packageName?.toString() ?: return
+
+        // Debounce: skip if same package fired again within DEBOUNCE_MS
+        val now = System.currentTimeMillis()
+        if (packageName == lastPackage && now - lastEventTime < DEBOUNCE_MS) return
+        lastPackage = packageName
+        lastEventTime = now
+
         Log.d("BlockerAccessibility", "Foreground App: $packageName")
-        
+
         // Run blocking checks in the background to prevent ANRs
         serviceScope.launch {
             checkAndBlockIfNeeded(packageName)

@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import com.focusguard.data.datasource.UsageStatsDataSource
 import com.focusguard.domain.model.AppUsage
+import com.focusguard.domain.model.WeeklyDayUsage
+import java.text.SimpleDateFormat
+import java.util.*
 
 class UsageRepositoryImpl(
     private val context: Context,
@@ -11,93 +14,105 @@ class UsageRepositoryImpl(
 ) {
 
     companion object {
-        /**
-         * System internals that appear in usage stats due to OS mechanics but carry
-         * zero user-meaningful information. Completely hidden from stats AND blocks.
-         * Blocking any of these would break core phone functionality.
-         */
         val ALWAYS_HIDDEN: Set<String> = setOf(
-            // Android OS framework itself
             "android",
-            // System UI: status bar, notification shade, nav bar
             "com.android.systemui",
-            // Home screen / launchers
-            "com.android.launcher",
-            "com.android.launcher2",
-            "com.android.launcher3",
-            "com.google.android.launcher",
-            "com.google.android.apps.nexuslauncher",
-            "com.sec.android.app.launcher",          // Samsung
-            "com.miui.home",                          // Xiaomi
-            "com.oneplus.launcher",                   // OnePlus
-            // Keyboards / input methods
-            "com.android.inputmethod.latin",
-            "com.google.android.inputmethod.latin",
-            "com.samsung.android.honeyboard",
-            "com.swiftkey.swiftkeyapp",
-            "com.touchtype.swiftkey",
-            // Core system services
-            "com.android.settings",
-            "com.android.packageinstaller",
-            "com.android.bluetooth",
-            "com.android.nfc",
-            "com.android.server.telecom",
-            "com.android.providers.telephony",
-            "com.android.providers.contacts",
-            "com.android.providers.media",
-            // Google core services (not user-facing)
-            "com.google.android.gms",
-            "com.google.android.gsf",
+            "com.android.launcher", "com.android.launcher2", "com.android.launcher3",
+            "com.google.android.launcher", "com.google.android.apps.nexuslauncher",
+            "com.sec.android.app.launcher", "com.miui.home", "com.oneplus.launcher",
+            "com.android.inputmethod.latin", "com.google.android.inputmethod.latin",
+            "com.samsung.android.honeyboard", "com.swiftkey.swiftkeyapp", "com.touchtype.swiftkey",
+            "com.android.settings", "com.android.packageinstaller",
+            "com.android.bluetooth", "com.android.nfc",
+            "com.android.server.telecom", "com.android.providers.telephony",
+            "com.android.providers.contacts", "com.android.providers.media",
+            "com.google.android.gms", "com.google.android.gsf",
             "com.google.android.syncadapters.contacts",
         )
 
-        /**
-         * User-facing apps that are safe to show in usage stats (users may spend time here),
-         * but MUST NOT be blockable — they handle emergency calls, SMS, and core communication.
-         */
         val NEVER_BLOCKABLE: Set<String> = setOf(
-            // Phone / dialer — emergency calls (911, 112, etc.)
-            "com.android.dialer",
-            "com.google.android.dialer",
-            "com.samsung.android.dialer",
-            "com.android.phone",
-            // SMS / MMS — emergency messaging
-            "com.android.mms",
-            "com.android.messaging",
-            "com.google.android.apps.messaging",
-            "com.samsung.android.messaging",
-            // Contacts — needed to make calls
-            "com.android.contacts",
-            "com.samsung.android.contacts",
+            "com.android.dialer", "com.google.android.dialer",
+            "com.samsung.android.dialer", "com.android.phone",
+            "com.android.mms", "com.android.messaging",
+            "com.google.android.apps.messaging", "com.samsung.android.messaging",
+            "com.android.contacts", "com.samsung.android.contacts",
         )
     }
 
     fun getDailyUsage(): List<AppUsage> {
         val packageManager = context.packageManager
-
         return dataSource.getTodayUsage()
-            // Remove system noise entirely
-            .filter { usageStats ->
-                usageStats.packageName !in ALWAYS_HIDDEN &&
-                !usageStats.packageName.startsWith("com.android.server") &&
-                usageStats.packageName != context.packageName
-            }
+            .filter { it.packageName !in ALWAYS_HIDDEN
+                    && !it.packageName.startsWith("com.android.server")
+                    && it.packageName != context.packageName }
             .map { usageStats ->
                 val appName = try {
-                    val appInfo = packageManager.getApplicationInfo(usageStats.packageName, 0)
-                    packageManager.getApplicationLabel(appInfo).toString()
-                } catch (e: PackageManager.NameNotFoundException) {
-                    usageStats.packageName
-                }
+                    val info = packageManager.getApplicationInfo(usageStats.packageName, 0)
+                    packageManager.getApplicationLabel(info).toString()
+                } catch (_: PackageManager.NameNotFoundException) { usageStats.packageName }
 
                 AppUsage(
-                    packageName = usageStats.packageName,
-                    appName = appName,
+                    packageName    = usageStats.packageName,
+                    appName        = appName,
                     usageTimeMillis = usageStats.totalTimeInForeground,
-                    isBlockable = usageStats.packageName !in NEVER_BLOCKABLE
+                    isBlockable    = usageStats.packageName !in NEVER_BLOCKABLE
                 )
             }
-            // Only keep entries with actual usage time
             .filter { it.usageTimeMillis > 0 }
+    }
+
+    /**
+     * Returns per-day totals for the past 7 days (index 0 = today, 6 = six days ago).
+     * Runs on the caller's dispatcher — call from IO.
+     */
+    fun getWeeklyUsage(): List<WeeklyDayUsage> {
+        val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
+        return (0..6).map { offset ->
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0);      set(Calendar.MILLISECOND, 0)
+                add(Calendar.DAY_OF_YEAR, -offset)
+            }
+            val dayLabel = dayFormat.format(cal.time)
+
+            val total = dataSource.getDayUsage(offset)
+                .filter { it.packageName !in ALWAYS_HIDDEN
+                        && !it.packageName.startsWith("com.android.server")
+                        && it.packageName != context.packageName }
+                .sumOf { it.totalTimeInForeground }
+
+            WeeklyDayUsage(
+                dayLabel   = dayLabel,
+                totalMillis = total,
+                isToday    = offset == 0
+            )
+        }.reversed() // oldest → newest left-to-right
+    }
+
+    /**
+     * Returns per-app usage for a specific day.
+     * @param dayOffset 0 = today, 1 = yesterday, …, 6 = six days ago.
+     */
+    fun getDayAppUsage(dayOffset: Int): List<AppUsage> {
+        val packageManager = context.packageManager
+        return dataSource.getDayUsage(dayOffset)
+            .filter { it.packageName !in ALWAYS_HIDDEN
+                    && !it.packageName.startsWith("com.android.server")
+                    && it.packageName != context.packageName
+                    && it.totalTimeInForeground > 0 }
+            .map { usageStats ->
+                val appName = try {
+                    val info = packageManager.getApplicationInfo(usageStats.packageName, 0)
+                    packageManager.getApplicationLabel(info).toString()
+                } catch (_: PackageManager.NameNotFoundException) { usageStats.packageName }
+
+                AppUsage(
+                    packageName     = usageStats.packageName,
+                    appName         = appName,
+                    usageTimeMillis = usageStats.totalTimeInForeground,
+                    isBlockable     = usageStats.packageName !in NEVER_BLOCKABLE
+                )
+            }
+            .sortedByDescending { it.usageTimeMillis }
     }
 }

@@ -30,6 +30,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.focusguard.data.local.FocusSession
+import com.focusguard.ui.home.rememberAppIcon
+import com.focusguard.ui.theme.FGColors
+import com.focusguard.ui.theme.FG_Error
+import com.focusguard.ui.theme.FG_Seg0
+import com.focusguard.ui.theme.FG_Seg1
+import com.focusguard.ui.theme.FG_Seg2
+import com.focusguard.ui.theme.FG_Seg3
+import com.focusguard.ui.theme.FG_Track
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -50,7 +60,7 @@ private sealed class SessionNav {
 //  Root: handles in-page navigation stack
 // ─────────────────────────────────────────────────────────────────
 @Composable
-fun SessionsScreen(viewModel: SessionsViewModel) {
+fun SessionsScreen(viewModel: SessionsViewModel, isDarkMode: Boolean = false) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     var nav by remember { mutableStateOf<SessionNav>(SessionNav.Main) }
@@ -105,26 +115,40 @@ fun SessionsScreen(viewModel: SessionsViewModel) {
 fun SessionsMainScreen(
     state: SessionsState,
     viewModel: SessionsViewModel,
+    isDarkMode: Boolean = false,
     onCreateNew: () -> Unit,
     onEditSession: (FocusSession) -> Unit,
     onStartSession: (FocusSession) -> Unit
 ) {
     val sessionsForDay = viewModel.sessionsForSelectedDate()
+    val bg    = FGColors.bg(isDarkMode)
+    val hdrBg = FGColors.header(isDarkMode)
+    val txtPri = FGColors.txtPri(isDarkMode)
+    val txtSec = FGColors.txtSec(isDarkMode)
 
     Scaffold(
+        containerColor = bg,
         topBar = {
             TopAppBar(
-                title = { Text("Focus Sessions", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Shield, contentDescription = null,
+                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("FocusGuard", fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp, color = txtPri)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = hdrBg)
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onCreateNew,
-                icon    = { Icon(Icons.Default.Add, contentDescription = "Create") },
-                text    = { Text("New Session") }
+                onClick     = onCreateNew,
+                icon        = { Icon(Icons.Default.Add, contentDescription = "Create") },
+                text        = { Text("New Session") },
+                containerColor = FG_Seg1,
+                contentColor   = Color.White
             )
         }
     ) { padding ->
@@ -135,88 +159,62 @@ fun SessionsMainScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-
-            // ── Calendar strip ────────────────────────────────
-            item { CalendarWeekStrip(state = state, viewModel = viewModel) }
+            item { CalendarWeekStrip(state = state, viewModel = viewModel, isDarkMode = isDarkMode) }
             item { Spacer(modifier = Modifier.height(16.dp)) }
 
-            // ── Active session card ───────────────────────────
             if (state.isSessionActive) {
                 item {
                     ActiveSessionCard(
-                        name           = state.activeSessionName,
-                        emoji          = state.activeSessionEmoji,
+                        name            = state.activeSessionName,
+                        emoji           = state.activeSessionEmoji,
                         remainingMillis = state.activeSessionRemainingMillis,
-                        blockedCount   = state.activeSessionBlockedCount,
-                        onStop         = { viewModel.stopSession() }
+                        blockedCount    = state.activeSessionBlockedCount,
+                        isDarkMode      = isDarkMode,
+                        onStop          = { viewModel.stopSession() }
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
 
-            // ── Today's sessions ──────────────────────────────
             if (sessionsForDay.isNotEmpty()) {
                 item {
-                    Text(
-                        "Today's Sessions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    Text("Today's Sessions", fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp, color = FGColors.txtPri(isDarkMode),
+                        modifier = Modifier.padding(vertical = 8.dp))
                 }
                 items(sessionsForDay) { s ->
-                    SavedSessionCard(
-                        session  = s,
+                    SavedSessionCard(session = s, isDarkMode = isDarkMode,
                         isActive = state.isSessionActive && state.activeSessionName == s.name,
-                        onEdit   = { onEditSession(s) },
-                        onStart  = { onStartSession(s) }
-                    )
+                        onEdit = { onEditSession(s) }, onStart = { onStartSession(s) })
                     Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 
-            // ── Suggested sessions ────────────────────────────
             item {
-                Text(
-                    "Suggested Sessions",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+                Text("Suggested Sessions", fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp, color = FGColors.txtPri(isDarkMode),
+                    modifier = Modifier.padding(vertical = 8.dp))
             }
             items(state.suggestedSessions) { s ->
-                SuggestedSessionCard(
-                    s     = s,
-                    onAdd = {
-                        val fs = viewModel.newSessionFromSuggested(s)
-                        onEditSession(fs)  // open editor pre-filled
-                    }
-                )
+                SuggestedSessionCard(s = s, isDarkMode = isDarkMode,
+                    onAdd = { val fs = viewModel.newSessionFromSuggested(s); onEditSession(fs) })
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            // ── All saved sessions ────────────────────────────
             if (state.sessions.any { it !in sessionsForDay }) {
                 item {
-                    Text(
-                        "My Sessions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    Text("My Sessions", fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp, color = FGColors.txtPri(isDarkMode),
+                        modifier = Modifier.padding(vertical = 8.dp))
                 }
                 items(state.sessions.filter { it !in sessionsForDay }) { s ->
-                    SavedSessionCard(
-                        session  = s,
+                    SavedSessionCard(session = s, isDarkMode = isDarkMode,
                         isActive = state.isSessionActive && state.activeSessionName == s.name,
-                        onEdit   = { onEditSession(s) },
-                        onStart  = { onStartSession(s) }
-                    )
+                        onEdit = { onEditSession(s) }, onStart = { onStartSession(s) })
                     Spacer(modifier = Modifier.height(10.dp))
                 }
             }
-
-            item { Spacer(modifier = Modifier.height(80.dp)) } // FAB clearance
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
 }
@@ -225,51 +223,46 @@ fun SessionsMainScreen(
 //  Calendar week strip
 // ─────────────────────────────────────────────────────────────────
 @Composable
-fun CalendarWeekStrip(state: SessionsState, viewModel: SessionsViewModel) {
-    val today       = LocalDate.now()
-    val weekStart   = today.minusDays(today.dayOfWeek.value.toLong() - 1)
+fun CalendarWeekStrip(state: SessionsState, viewModel: SessionsViewModel, isDarkMode: Boolean = false) {
+    val today     = LocalDate.now()
+    val weekStart = today.minusDays(today.dayOfWeek.value.toLong() - 1)
         .plusWeeks(state.weekOffset.toLong())
+    val txtPri = FGColors.txtPri(isDarkMode)
+    val txtSec = FGColors.txtSec(isDarkMode)
 
     Column {
-        // Month header + nav
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = { viewModel.navigateWeek(-1) }) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = "Previous week")
+                Icon(Icons.Default.ChevronLeft, contentDescription = "Previous week", tint = txtSec)
             }
             Text(
                 text = weekStart.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = txtPri
             )
             IconButton(onClick = { viewModel.navigateWeek(1) }) {
-                Icon(Icons.Default.ChevronRight, contentDescription = "Next week")
+                Icon(Icons.Default.ChevronRight, contentDescription = "Next week", tint = txtSec)
             }
         }
 
-        // Day chips
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             repeat(7) { i ->
-                val date      = weekStart.plusDays(i.toLong())
-                val isToday   = date == today
+                val date       = weekStart.plusDays(i.toLong())
+                val isToday    = date == today
                 val isSelected = date == state.selectedDate
-                val dayLabel  = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).take(1)
+                val dayLabel   = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).take(1)
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.clickable { viewModel.selectDate(date) }
                 ) {
-                    Text(
-                        text  = dayLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(dayLabel, fontSize = 11.sp, color = txtSec)
                     Spacer(modifier = Modifier.height(4.dp))
                     Box(
                         modifier = Modifier
@@ -277,27 +270,22 @@ fun CalendarWeekStrip(state: SessionsState, viewModel: SessionsViewModel) {
                             .clip(RoundedCornerShape(12.dp))
                             .background(
                                 when {
-                                    isSelected -> MaterialTheme.colorScheme.primaryContainer
-                                    isToday    -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha=0.5f)
+                                    isSelected -> FG_Seg1
+                                    isToday    -> FG_Seg3.copy(alpha = 0.25f)
                                     else       -> Color.Transparent
                                 }
-                            )
-                            .border(
-                                width = if(isSelected) 2.dp else 0.dp,
-                                color = if(isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                shape = RoundedCornerShape(12.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text  = date.dayOfMonth.toString(),
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = date.dayOfMonth.toString(),
+                            fontSize = 14.sp,
                             color = when {
-                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                                isToday    -> MaterialTheme.colorScheme.secondary
-                                else       -> MaterialTheme.colorScheme.onSurface
+                                isSelected -> Color.White
+                                isToday    -> FG_Seg1
+                                else       -> txtPri
                             },
-                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }
@@ -315,60 +303,56 @@ fun ActiveSessionCard(
     emoji: String,
     remainingMillis: Long,
     blockedCount: Int,
+    isDarkMode: Boolean = false,
     onStop: () -> Unit
 ) {
     val h  = (remainingMillis / 3_600_000).toInt()
     val m  = ((remainingMillis % 3_600_000) / 60_000).toInt()
     val s  = ((remainingMillis % 60_000) / 1_000).toInt()
     val timeStr = if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+    val cardBg  = FGColors.card(isDarkMode)
+    val txtPri  = FGColors.txtPri(isDarkMode)
+    val txtSec  = FGColors.txtSec(isDarkMode)
 
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp)
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors    = CardDefaults.cardColors(containerColor = cardBg),
+        shape     = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(emoji, fontSize = 28.sp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Active Session", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary)
-                    Text(name, style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold)
+                    Text("Active Session", fontSize = 11.sp, color = FG_Seg1,
+                        fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+                    Text(name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = txtPri)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp),
-                    strokeWidth = 6.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    modifier    = Modifier.size(48.dp),
+                    strokeWidth = 5.dp,
+                    color       = FG_Seg1,
+                    trackColor  = FGColors.track(isDarkMode)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text(
-                        text  = timeStr,
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text  = "$blockedCount apps blocked",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(timeStr, fontWeight = FontWeight.Black,
+                        fontSize = 28.sp, color = txtPri)
+                    Text("$blockedCount apps blocked",
+                        fontSize = 12.sp, color = txtSec)
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             OutlinedButton(
-                onClick = onStop,
-                colors  = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                onClick  = onStop,
+                colors   = ButtonDefaults.outlinedButtonColors(contentColor = FG_Error),
+                border   = androidx.compose.foundation.BorderStroke(1.dp, FG_Error),
                 modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape   = RoundedCornerShape(16.dp)
+                shape    = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Close, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -382,39 +366,43 @@ fun ActiveSessionCard(
 //  Suggested session card
 // ─────────────────────────────────────────────────────────────────
 @Composable
-fun SuggestedSessionCard(s: SuggestedSession, onAdd: () -> Unit) {
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors   = CardDefaults.outlinedCardColors(containerColor = Color.Transparent),
-        border   = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape    = RoundedCornerShape(16.dp)
+fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd: () -> Unit) {
+    val cardBg = FGColors.card(isDarkMode)
+    val surfBg = FGColors.surf(isDarkMode)
+    val txtPri = FGColors.txtPri(isDarkMode)
+    val txtSec = FGColors.txtSec(isDarkMode)
+
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        colors    = CardDefaults.cardColors(containerColor = cardBg),
+        shape     = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(14.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(surfBg),
                 contentAlignment = Alignment.Center
-            ) {
-                Text(s.emoji, fontSize = 24.sp)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
+            ) { Text(s.emoji, fontSize = 24.sp) }
+            Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(s.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(4.dp))
+                Text(s.name, fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp, color = txtPri)
+                Spacer(modifier = Modifier.height(3.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Default.AccessTime, contentDescription = null,
+                        modifier = Modifier.size(12.dp), tint = txtSec)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         "%02d:%02d – %02d:%02d".format(s.fromHour, s.fromMinute, s.toHour, s.toMinute),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontSize = 12.sp, color = txtSec
                     )
                 }
             }
             IconButton(onClick = onAdd) {
-                Icon(Icons.Default.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Add, contentDescription = "Add", tint = FG_Seg1)
             }
         }
     }
@@ -427,64 +415,48 @@ fun SuggestedSessionCard(s: SuggestedSession, onAdd: () -> Unit) {
 fun SavedSessionCard(
     session: FocusSession,
     isActive: Boolean,
+    isDarkMode: Boolean = false,
     onEdit: () -> Unit,
     onStart: () -> Unit
 ) {
-    val tagColor = DEFAULT_TAGS.firstOrNull { it.name == session.tag }?.colorHex ?: "#888888"
-    val parsed   = runCatching { android.graphics.Color.parseColor(tagColor) }.getOrDefault(0xFF888888.toInt())
-    val composeColor = Color(parsed)
+    val cardBg = FGColors.card(isDarkMode)
+    val surfBg = FGColors.surf(isDarkMode)
+    val txtPri = FGColors.txtPri(isDarkMode)
+    val txtSec = FGColors.txtSec(isDarkMode)
 
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth().clickable { onEdit() },
-        colors   = CardDefaults.outlinedCardColors(containerColor = Color.Transparent),
-        border   = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape    = RoundedCornerShape(16.dp)
+    Card(
+        modifier  = Modifier.fillMaxWidth().clickable { onEdit() },
+        colors    = CardDefaults.cardColors(containerColor = cardBg),
+        shape     = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(14.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(composeColor.copy(alpha=0.2f)),
+                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(surfBg),
                 contentAlignment = Alignment.Center
-            ) {
-                Text(session.emoji, fontSize = 24.sp)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
+            ) { Text(session.emoji, fontSize = 22.sp) }
+            Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(session.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp).clip(CircleShape)
-                            .background(composeColor)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(session.tag, style = MaterialTheme.typography.labelSmall, color = composeColor)
-                }
+                Text(session.name, fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp, color = txtPri)
                 val timeRange = "%02d:%02d – %02d:%02d".format(
-                    session.fromHour, session.fromMinute, session.toHour, session.toMinute
-                )
-                val daysStr = if (session.repeatEnabled) {
-                    listOf("M","T","W","T","F","S","S")
-                        .filterIndexed { i, _ -> i in session.repeatDays }
-                        .joinToString(" ")
-                } else session.oneTimeDate
-                Text("$timeRange  •  $daysStr", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    session.fromHour, session.fromMinute, session.toHour, session.toMinute)
+                Text(timeRange, fontSize = 12.sp, color = txtSec)
                 if (session.blockedPackages.isNotEmpty()) {
                     Text("${session.blockedPackages.size} apps blocked",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                        fontSize = 11.sp, color = FG_Error)
                 }
             }
             if (!isActive) {
                 FilledIconButton(
                     onClick = onStart,
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    colors  = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = FG_Seg1, contentColor = Color.White)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Start", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Start")
                 }
             }
         }
@@ -876,12 +848,21 @@ fun CreateSessionScreen(
 fun AppPickerScreen(
     allApps: List<AppInfo>,
     selectedPackages: Set<String>,
+    isDarkMode: Boolean = false,
     onDone: (Set<String>) -> Unit,
     onBack: () -> Unit
 ) {
     var chosen  by remember { mutableStateOf(selectedPackages) }
     var query   by remember { mutableStateOf("") }
     var snackMsg by remember { mutableStateOf<String?>(null) }
+
+    val bg     = FGColors.bg(isDarkMode)
+    val hdrBg  = FGColors.header(isDarkMode)
+    val cardBg = FGColors.card(isDarkMode)
+    val surfBg = FGColors.surf(isDarkMode)
+    val txtPri = FGColors.txtPri(isDarkMode)
+    val txtSec = FGColors.txtSec(isDarkMode)
+    val track  = FGColors.track(isDarkMode)
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -896,79 +877,72 @@ fun AppPickerScreen(
     else allApps.filter { it.appName.contains(query, ignoreCase = true) }
 
     Scaffold(
+        containerColor = bg,
         topBar = {
             TopAppBar(
-                title = { Text("Select Apps to Block", fontWeight = FontWeight.Bold) },
+                title = { Text("Select Apps to Block", fontWeight = FontWeight.Bold, color = txtPri) },
                 navigationIcon = {},
                 actions = {
                     IconButton(onClick = { onDone(chosen) }) {
-                        Icon(Icons.Default.Close, contentDescription = "Done")
+                        Icon(Icons.Default.Check, contentDescription = "Done", tint = FG_Seg1)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = hdrBg)
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) { data ->
-            Card(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                shape    = RoundedCornerShape(50.dp),
-                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-            }
-        }}
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Search bar
             OutlinedTextField(
                 value         = query,
                 onValueChange = { query = it },
-                placeholder   = { Text("Search apps") },
-                leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null) },
+                placeholder   = { Text("Search apps", color = txtSec) },
+                leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null, tint = FG_Seg1) },
                 singleLine    = true,
                 shape         = RoundedCornerShape(14.dp),
-                modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                colors        = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = FG_Seg1,
+                    unfocusedBorderColor = FGColors.track(isDarkMode)
+                )
             )
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(filtered) { app ->
                     val isSelected = app.packageName in chosen
+                    val icon = rememberAppIcon(app.packageName)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                chosen = if (isSelected) chosen - app.packageName
-                                else chosen + app.packageName
+                                chosen = if (isSelected) chosen - app.packageName else chosen + app.packageName
                                 if (!isSelected) snackMsg = "Added to blocked apps"
                             }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // App icon placeholder letter
                         Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(surfBg),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text  = app.appName.take(1).uppercase(),
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            if (icon != null) {
+                                androidx.compose.foundation.Image(
+                                    bitmap = icon.toBitmap(64, 64).asImageBitmap(),
+                                    contentDescription = app.appName,
+                                    modifier = Modifier.size(34.dp)
+                                )
+                            } else {
+                                Text(app.appName.take(1).uppercase(),
+                                    fontWeight = FontWeight.Bold, color = FG_Seg1)
+                            }
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
                         Text(
                             text     = app.appName,
                             modifier = Modifier.weight(1f),
-                            style    = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp,
+                            color    = txtPri,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -977,10 +951,15 @@ fun AppPickerScreen(
                             onCheckedChange = { on ->
                                 chosen = if (on) chosen + app.packageName else chosen - app.packageName
                                 if (on) snackMsg = "Added to blocked apps"
-                            }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor  = FG_Seg1,
+                                checkedTrackColor  = FG_Seg3.copy(alpha = 0.4f)
+                            )
                         )
                     }
-                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    HorizontalDivider(color = track, thickness = 0.5.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp))
                 }
             }
         }

@@ -7,11 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.focusguard.data.local.FocusSession
 import com.focusguard.data.local.SessionStorage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -245,19 +247,21 @@ class SessionsViewModel(
     fun loadInstalledApps(context: Context) {
         if (_state.value.installedApps.isNotEmpty()) return
         viewModelScope.launch {
-            val pm   = context.packageManager
-            val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }   // user apps only
-                .filter { it.packageName != context.packageName }            // exclude FocusGuard
-                .mapNotNull { info ->
-                    runCatching {
-                        AppInfo(
-                            packageName = info.packageName,
-                            appName     = pm.getApplicationLabel(info).toString()
-                        )
-                    }.getOrNull()
-                }
-                .sortedBy { it.appName }
+            val apps = withContext(Dispatchers.IO) {
+                val pm = context.packageManager
+                pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                    .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }   // user apps only
+                    .filter { it.packageName != context.packageName }            // exclude FocusGuard
+                    .mapNotNull { info ->
+                        runCatching {
+                            AppInfo(
+                                packageName = info.packageName,
+                                appName     = pm.getApplicationLabel(info).toString()
+                            )
+                        }.getOrNull()
+                    }
+                    .sortedBy { it.appName }
+            }
             _state.value = _state.value.copy(installedApps = apps)
         }
     }
