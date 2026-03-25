@@ -45,17 +45,19 @@ class UsageRepositoryImpl(
             .filter { it.packageName !in ALWAYS_HIDDEN
                     && !it.packageName.startsWith("com.android.server")
                     && it.packageName != context.packageName }
-            .map { usageStats ->
+            .groupBy { it.packageName }
+            .map { (packageName, stats) ->
+                val totalTime = stats.sumOf { it.totalTimeInForeground }
                 val appName = try {
-                    val info = packageManager.getApplicationInfo(usageStats.packageName, 0)
+                    val info = packageManager.getApplicationInfo(packageName, 0)
                     packageManager.getApplicationLabel(info).toString()
-                } catch (_: PackageManager.NameNotFoundException) { usageStats.packageName }
+                } catch (_: PackageManager.NameNotFoundException) { packageName }
 
                 AppUsage(
-                    packageName    = usageStats.packageName,
-                    appName        = appName,
-                    usageTimeMillis = usageStats.totalTimeInForeground,
-                    isBlockable    = usageStats.packageName !in NEVER_BLOCKABLE
+                    packageName     = packageName,
+                    appName         = appName,
+                    usageTimeMillis = totalTime,
+                    isBlockable     = packageName !in NEVER_BLOCKABLE
                 )
             }
             .filter { it.usageTimeMillis > 0 }
@@ -100,17 +102,19 @@ class UsageRepositoryImpl(
                     && !it.packageName.startsWith("com.android.server")
                     && it.packageName != context.packageName
                     && it.totalTimeInForeground > 0 }
-            .map { usageStats ->
+            .groupBy { it.packageName }
+            .map { (packageName, stats) ->
+                val totalTime = stats.sumOf { it.totalTimeInForeground }
                 val appName = try {
-                    val info = packageManager.getApplicationInfo(usageStats.packageName, 0)
+                    val info = packageManager.getApplicationInfo(packageName, 0)
                     packageManager.getApplicationLabel(info).toString()
-                } catch (_: PackageManager.NameNotFoundException) { usageStats.packageName }
+                } catch (_: PackageManager.NameNotFoundException) { packageName }
 
                 AppUsage(
-                    packageName     = usageStats.packageName,
+                    packageName     = packageName,
                     appName         = appName,
-                    usageTimeMillis = usageStats.totalTimeInForeground,
-                    isBlockable     = usageStats.packageName !in NEVER_BLOCKABLE
+                    usageTimeMillis = totalTime,
+                    isBlockable     = packageName !in NEVER_BLOCKABLE
                 )
             }
             .sortedByDescending { it.usageTimeMillis }

@@ -24,12 +24,7 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".ui.blocks.BlockActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:excludeFromRecents="true"
-            android:theme="@style/Theme.FocusGuard.Translucent" />
+
 
         <service
             android:name=".core.services.BlockerAccessibilityService"

@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.focusguard.ui.extensions.clickableScale
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -197,7 +198,8 @@ fun SessionsMainScreen(
             }
             items(state.suggestedSessions) { s ->
                 SuggestedSessionCard(s = s, isDarkMode = isDarkMode,
-                    onAdd = { val fs = viewModel.newSessionFromSuggested(s); onEditSession(fs) })
+                    onAdd = { val fs = viewModel.newSessionFromSuggested(s); onEditSession(fs) },
+                    onStart = { val fs = viewModel.newSessionFromSuggested(s); viewModel.startSession(fs) })
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
@@ -366,14 +368,14 @@ fun ActiveSessionCard(
 //  Suggested session card
 // ─────────────────────────────────────────────────────────────────
 @Composable
-fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd: () -> Unit) {
+fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd: () -> Unit, onStart: () -> Unit) {
     val cardBg = FGColors.card(isDarkMode)
     val surfBg = FGColors.surf(isDarkMode)
     val txtPri = FGColors.txtPri(isDarkMode)
     val txtSec = FGColors.txtSec(isDarkMode)
 
     Card(
-        modifier  = Modifier.fillMaxWidth(),
+        modifier  = Modifier.fillMaxWidth().clickableScale { onAdd() },
         colors    = CardDefaults.cardColors(containerColor = cardBg),
         shape     = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(1.dp)
@@ -401,7 +403,7 @@ fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd
                     )
                 }
             }
-            IconButton(onClick = onAdd) {
+            IconButton(onClick = onStart) {
                 Icon(Icons.Default.Add, contentDescription = "Add", tint = FG_Seg1)
             }
         }
@@ -425,7 +427,7 @@ fun SavedSessionCard(
     val txtSec = FGColors.txtSec(isDarkMode)
 
     Card(
-        modifier  = Modifier.fillMaxWidth().clickable { onEdit() },
+        modifier  = Modifier.fillMaxWidth().clickableScale { onEdit() },
         colors    = CardDefaults.cardColors(containerColor = cardBg),
         shape     = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(1.dp)

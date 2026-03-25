@@ -31,6 +31,11 @@ import com.focusguard.data.local.LimitManager
 import com.focusguard.data.local.SessionStorage
 import com.focusguard.data.repository.UsageRepositoryImpl
 import com.focusguard.domain.usecase.GetDailyUsageUseCase
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.ui.graphics.toArgb
 import com.focusguard.ui.blocks.BlocksScreen
 import com.focusguard.ui.blocks.BlocksViewModel
 import com.focusguard.ui.home.HomeScreen
@@ -38,8 +43,11 @@ import com.focusguard.ui.home.HomeViewModel
 import com.focusguard.ui.sessions.SessionsScreen
 import com.focusguard.ui.settings.SettingsScreen
 import com.focusguard.ui.theme.FGColors
+import com.focusguard.ui.theme.FG_Error
 import com.focusguard.ui.theme.FG_Seg0
 import com.focusguard.ui.theme.FG_Seg1
+import com.focusguard.ui.theme.FG_Seg2
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.NavigationBarItemDefaults
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -112,14 +120,48 @@ fun FocusGuardApp(
 
     val items = listOf(Screen.Home, Screen.Blocks, Screen.Sessions, Screen.Settings)
 
-    val bg     = FGColors.header(isDarkMode)
-    val txtSec = FGColors.txtSec(isDarkMode)
+    val bg       = FGColors.header(isDarkMode) // using header for bottom bar / status bar to match TopAppBar
+    val card     = FGColors.card(isDarkMode)
+    val surf     = FGColors.surf(isDarkMode)
+    val txtPri   = FGColors.txtPri(isDarkMode)
+    val txtSec   = FGColors.txtSec(isDarkMode)
+
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        androidx.compose.runtime.SideEffect {
+            val window = (view.context as android.app.Activity).window
+            window.statusBarColor = bg.toArgb()
+            window.navigationBarColor = bg.toArgb()
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !isDarkMode
+            controller.isAppearanceLightNavigationBars = !isDarkMode
+        }
+    }
+
+    val colorScheme = if (isDarkMode) {
+        androidx.compose.material3.darkColorScheme(
+            primary = FG_Seg0, onPrimary = Color.White,
+            primaryContainer = FG_Seg1, onPrimaryContainer = Color.White,
+            secondary = FG_Seg2,
+            background = FGColors.bg(isDarkMode), onBackground = txtPri,
+            surface = surf, onSurface = txtPri,
+            surfaceVariant = card, onSurfaceVariant = txtSec,
+            error = FG_Error
+        )
+    } else {
+        androidx.compose.material3.lightColorScheme(
+            primary = FG_Seg0, onPrimary = Color.White,
+            primaryContainer = FG_Seg1, onPrimaryContainer = Color.White,
+            secondary = FG_Seg2,
+            background = FGColors.bg(isDarkMode), onBackground = txtPri,
+            surface = surf, onSurface = txtPri,
+            surfaceVariant = card, onSurfaceVariant = txtSec,
+            error = FG_Error
+        )
+    }
 
     androidx.compose.material3.MaterialTheme(
-        colorScheme = if (isDarkMode)
-            androidx.compose.material3.darkColorScheme()
-        else
-            androidx.compose.material3.lightColorScheme()
+        colorScheme = colorScheme
     ) {
         Scaffold(
             bottomBar = {
@@ -158,7 +200,11 @@ fun FocusGuardApp(
             NavHost(
                 navController    = navController,
                 startDestination = Screen.Home.route,
-                modifier         = Modifier.padding(innerPadding)
+                modifier         = Modifier.padding(innerPadding),
+                enterTransition  = { slideInHorizontally(initialOffsetX = { 50 }) + fadeIn() },
+                exitTransition   = { slideOutHorizontally(targetOffsetX = { -50 }) + fadeOut() },
+                popEnterTransition = { slideInHorizontally(initialOffsetX = { -50 }) + fadeIn() },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { 50 }) + fadeOut() }
             ) {
                 composable(Screen.Home.route) {
                     HomeScreen(

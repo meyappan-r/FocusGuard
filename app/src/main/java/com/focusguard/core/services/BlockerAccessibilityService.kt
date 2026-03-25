@@ -67,7 +67,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                 val blocked = sessionStorage.getActiveBlockedPackages()
                 if (packageName in blocked) {
                     Log.d("BlockerAccessibility", "Session blocked: $packageName")
-                    launchBlockActivity(packageName, "session")
+                    BlockOverlayManager.showOverlay(this@BlockerAccessibilityService, packageName, "session")
                     return
                 }
             }
@@ -81,9 +81,14 @@ class BlockerAccessibilityService : AccessibilityService() {
             
             if (usageMillis >= limitMillis) {
                 Log.d("BlockerAccessibility", "Limit exceeded: $packageName ($usageMillis ms >= $limitMillis ms)")
-                launchBlockActivity(packageName, "limit")
+                BlockOverlayManager.showOverlay(this@BlockerAccessibilityService, packageName, "limit")
+                return
             }
         }
+
+        // 3. User switched to a non-blocked app -> Hide Overlay automatically!
+        val wm = getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
+        BlockOverlayManager.removeOverlay(wm)
     }
 
     private fun getTodayUsageMillis(packageName: String): Long {
@@ -98,21 +103,6 @@ class BlockerAccessibilityService : AccessibilityService() {
             val stats = usm.queryAndAggregateUsageStats(cal.timeInMillis, System.currentTimeMillis())
             stats[packageName]?.totalTimeInForeground ?: 0L
         }.getOrDefault(0L)
-    }
-
-    private fun launchBlockActivity(packageName: String, source: String) {
-        val appName = runCatching {
-            val info = packageManager.getApplicationInfo(packageName, 0)
-            packageManager.getApplicationLabel(info).toString()
-        }.getOrDefault(packageName)
-
-        val intent = Intent(this, com.focusguard.ui.blocks.BlockActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("BLOCKED_APP_NAME", appName)
-            putExtra("BLOCKED_PACKAGE", packageName)
-            putExtra("BLOCK_SOURCE", source)
-        }
-        startActivity(intent)
     }
 
     override fun onInterrupt() {

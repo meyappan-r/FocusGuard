@@ -6,7 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import com.focusguard.ui.extensions.clickableScale
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -240,7 +240,7 @@ fun TabToggle(
                     .weight(1f)
                     .clip(RoundedCornerShape(50))
                     .background(if (isActive) activeColor else Color.Transparent)
-                    .clickable { onSelect(tab) }
+                    .clickableScale { onSelect(tab) }
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -316,7 +316,7 @@ private fun TodayContent(
                 fontSize   = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color      = Seg1,
-                modifier   = Modifier.clickable { onToggleAll() }
+                modifier   = Modifier.clickableScale { onToggleAll() }
             )
         }
         Spacer(Modifier.height(10.dp))
@@ -670,7 +670,7 @@ private fun WeeklyContent(
                     text = "✕",
                     fontSize = 14.sp,
                     color = txtSec,
-                    modifier = Modifier.clickable { onDayTap(selectedDayIndex) }
+                    modifier = Modifier.clickableScale { onDayTap(selectedDayIndex) }
                 )
             }
 
@@ -732,7 +732,7 @@ fun WeeklyBarChart(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier            = Modifier
                     .weight(1f)
-                    .clickable { onDayTap(index) }
+                    .clickableScale { onDayTap(index) }
             ) {
                 // Label above bar (selected or today)
                 if ((isSelected || day.isToday) && day.totalMillis > 0) {

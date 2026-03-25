@@ -24,6 +24,7 @@ import com.focusguard.ui.theme.FG_Seg0
 import com.focusguard.ui.theme.FG_Seg1
 import com.focusguard.ui.theme.FG_Seg2
 import com.focusguard.ui.theme.FG_Seg3
+import com.focusguard.ui.extensions.clickableScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -207,7 +208,7 @@ private fun PermissionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(!isGranted) { onClick() }
+            .clickableScale(enabled = !isGranted) { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -278,7 +279,7 @@ private fun ActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickableScale { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
