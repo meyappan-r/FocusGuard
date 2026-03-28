@@ -28,6 +28,7 @@ class UsageRepositoryImpl(
             "com.android.providers.contacts", "com.android.providers.media",
             "com.google.android.gms", "com.google.android.gsf",
             "com.google.android.syncadapters.contacts",
+            "com.mi.android.globallauncher", "com.poco.launcher", "cc.kuka.poco.launcher",
         )
 
         val NEVER_BLOCKABLE: Set<String> = setOf(
@@ -39,15 +40,58 @@ class UsageRepositoryImpl(
         )
     }
 
+    private var hiddenPackagesCache: Set<String>? = null
+
+    private fun getHiddenPackages(): Set<String> {
+        hiddenPackagesCache?.let { return it }
+
+        val pm = context.packageManager
+        val hidden = mutableSetOf<String>()
+        hidden.addAll(ALWAYS_HIDDEN)
+
+        // 1. Launchers (CATEGORY_HOME)
+        val homeIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply { 
+            addCategory(android.content.Intent.CATEGORY_HOME) 
+        }
+        val homeInfos = pm.queryIntentActivities(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+        hidden.addAll(homeInfos.mapNotNull { it.activityInfo?.packageName })
+
+        // 2. Apps with FLAG_SYSTEM and no CATEGORY_LAUNCHER
+        val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply { 
+            addCategory(android.content.Intent.CATEGORY_LAUNCHER) 
+        }
+        val launcherPackages = pm.queryIntentActivities(launcherIntent, 0)
+            .mapNotNull { it.activityInfo?.packageName }.toSet()
+
+        val installedApps = pm.getInstalledApplications(0)
+        installedApps.forEach { appInfo ->
+            val isSystem = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            if (isSystem && !launcherPackages.contains(appInfo.packageName)) {
+                hidden.add(appInfo.packageName)
+            }
+        }
+
+        // 3. IME apps (BIND_INPUT_METHOD)
+        val imeIntent = android.content.Intent("android.view.InputMethod")
+        val imeServices = pm.queryIntentServices(imeIntent, 0)
+        imeServices.forEach { it.serviceInfo?.packageName?.let { pkg -> hidden.add(pkg) } }
+
+        hiddenPackagesCache = hidden
+        return hidden
+    }
+
     fun getDailyUsage(): List<AppUsage> {
         val packageManager = context.packageManager
         val end = System.currentTimeMillis()
         val start = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, -1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
         return dataSource.getSotByPackage(start, end)
-            .filter { it.key !in ALWAYS_HIDDEN
+            .filter { !getHiddenPackages().contains(it.key)
                     && !it.key.startsWith("com.android.server")
                     && it.key != context.packageName }
             .map { (packageName, totalTime) ->
@@ -85,7 +129,7 @@ class UsageRepositoryImpl(
             val end = minOf(cal.timeInMillis, System.currentTimeMillis())
 
             val total = dataSource.getSotByPackage(start, end)
-                .filter { it.key !in ALWAYS_HIDDEN
+                .filter { !getHiddenPackages().contains(it.key)
                         && !it.key.startsWith("com.android.server")
                         && it.key != context.packageName }
                 .values.sum()
@@ -115,7 +159,7 @@ class UsageRepositoryImpl(
         val end = minOf(cal.timeInMillis, System.currentTimeMillis())
 
         return dataSource.getSotByPackage(start, end)
-            .filter { it.key !in ALWAYS_HIDDEN
+            .filter { !getHiddenPackages().contains(it.key)
                     && !it.key.startsWith("com.android.server")
                     && it.key != context.packageName
                     && it.value > 0 }

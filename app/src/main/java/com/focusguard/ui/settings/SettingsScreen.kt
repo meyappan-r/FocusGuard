@@ -129,28 +129,13 @@ fun SettingsScreen(
             item { Spacer(Modifier.height(20.dp)) }
             item { SectionLabel("APPEARANCE", txtSec) }
             item {
-                SettingsCard(cardBg = cardBg) {
-                    ThemeOptionRow(
-                        title = "System Default",
-                        selected = state.themeMode == ThemeMode.SYSTEM,
-                        txtPri = txtPri,
-                        onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) }
-                    )
-                    HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                    ThemeOptionRow(
-                        title = "Light Mode",
-                        selected = state.themeMode == ThemeMode.LIGHT,
-                        txtPri = txtPri,
-                        onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) }
-                    )
-                    HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
-                    ThemeOptionRow(
-                        title = "Dark Mode",
-                        selected = state.themeMode == ThemeMode.DARK,
-                        txtPri = txtPri,
-                        onClick = { viewModel.setThemeMode(ThemeMode.DARK) }
-                    )
-                }
+                SegmentedThemeSelector(
+                    selectedMode = state.themeMode,
+                    onModeSelected = { viewModel.setThemeMode(it) },
+                    cardBg = cardBg,
+                    txtPri = txtPri,
+                    isDarkMode = isDarkMode
+                )
             }
 
             // ── About ─────────────────────────────────────────────
@@ -265,26 +250,84 @@ private fun PermissionRow(
 }
 
 @Composable
-private fun ThemeOptionRow(
-    title: String,
-    selected: Boolean,
+private fun SegmentedThemeSelector(
+    selectedMode: ThemeMode,
+    onModeSelected: (ThemeMode) -> Unit,
+    cardBg: Color,
     txtPri: Color,
-    onClick: () -> Unit
+    isDarkMode: Boolean
 ) {
-    Row(
+    val options = listOf(
+        ThemeMode.LIGHT  to Pair("Light",  Icons.Default.LightMode),
+        ThemeMode.SYSTEM to Pair("System", Icons.Default.Settings),
+        ThemeMode.DARK   to Pair("Dark",   Icons.Default.DarkMode)
+    )
+    val selectedIndex = options.indexOfFirst { it.first == selectedMode }.coerceAtLeast(0)
+    val trackBg  = FGColors.track(isDarkMode)
+    val txtSec   = FGColors.txtSec(isDarkMode)
+
+    // One single float animation drives the sliding pill
+    val pillOffset by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness    = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "pillOffset"
+    )
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(trackBg)
+            .padding(4.dp)
     ) {
-        androidx.compose.material3.RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = androidx.compose.material3.RadioButtonDefaults.colors(selectedColor = FG_Seg1)
+        val pillWidth = maxWidth / options.size
+
+        // Sliding pill background
+        Box(
+            modifier = Modifier
+                .offset(x = pillWidth * pillOffset)
+                .width(pillWidth)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(7.dp))
+                .background(cardBg)
         )
-        Spacer(Modifier.width(14.dp))
-        Text(title, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = txtPri)
+
+        // Labels row on top
+        Row(modifier = Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, option ->
+                val mode  = option.first
+                val label = option.second.first
+                val icon  = option.second.second
+                val isSelected = selectedIndex == index
+
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onModeSelected(mode) }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector        = icon,
+                        contentDescription = label,
+                        modifier           = Modifier.size(15.dp),
+                        tint               = if (isSelected) FG_Seg1 else txtSec
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text       = label,
+                        fontSize   = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        color      = if (isSelected) txtPri else txtSec
+                    )
+                }
+            }
+        }
     }
 }
 

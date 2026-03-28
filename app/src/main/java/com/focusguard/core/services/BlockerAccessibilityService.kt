@@ -17,13 +17,6 @@ class BlockerAccessibilityService : AccessibilityService() {
     private lateinit var limitManager: LimitManager
     private lateinit var sessionStorage: SessionStorage
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    // Debounce: skip duplicate events for the same package within 1 second
-    private var lastPackage: String = ""
-    private var lastEventTime: Long = 0L
-    private val DEBOUNCE_MS = 1_000L
-
-
     override fun onServiceConnected() {
         super.onServiceConnected()
         limitManager   = LimitManager(this)
@@ -35,12 +28,6 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val packageName = event.packageName?.toString() ?: return
 
-        // Debounce: skip if same package fired again within DEBOUNCE_MS
-        val now = System.currentTimeMillis()
-        if (packageName == lastPackage && now - lastEventTime < DEBOUNCE_MS) return
-        lastPackage = packageName
-        lastEventTime = now
-
         Log.d("BlockerAccessibility", "Foreground App: $packageName")
 
         // Run blocking checks in the background to prevent ANRs
@@ -50,11 +37,23 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun checkAndBlockIfNeeded(packageName: String) {
-        // Never block FocusGuard itself
-        if (packageName == this.packageName) return
+        val wm = getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
 
-        // Never block safety-critical apps (dialer, SMS, contacts — emergency access)
-        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.NEVER_BLOCKABLE) return
+        // Never block FocusGuard itself, remove overlay
+        if (packageName == this.packageName) {
+            BlockOverlayManager.removeOverlay(wm)
+            return
+        }
+
+        // Never block safety-critical apps (dialer, SMS), remove overlay
+        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.NEVER_BLOCKABLE) {
+            BlockOverlayManager.removeOverlay(wm)
+            return
+        }
+
+        // Ignore ALWAYS_HIDDEN (Launchers, SystemUI) to preserve the overlay visibility
+        // after forcing the user to the HOME screen.
+        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.ALWAYS_HIDDEN) return
 
         // ── 1. Session blocking ───────────────────────────────────────
         if (sessionStorage.isSessionActive()) {
@@ -67,6 +66,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                 val blocked = sessionStorage.getActiveBlockedPackages()
                 if (packageName in blocked) {
                     Log.d("BlockerAccessibility", "Session blocked: $packageName")
+                    withContext(Dispatchers.Main) { performGlobalAction(GLOBAL_ACTION_HOME) }
                     BlockOverlayManager.showOverlay(this@BlockerAccessibilityService, packageName, "session")
                     return
                 }
@@ -81,13 +81,13 @@ class BlockerAccessibilityService : AccessibilityService() {
             
             if (usageMillis >= limitMillis) {
                 Log.d("BlockerAccessibility", "Limit exceeded: $packageName ($usageMillis ms >= $limitMillis ms)")
+                withContext(Dispatchers.Main) { performGlobalAction(GLOBAL_ACTION_HOME) }
                 BlockOverlayManager.showOverlay(this@BlockerAccessibilityService, packageName, "limit")
                 return
             }
         }
 
-        // 3. User switched to a non-blocked app -> Hide Overlay automatically!
-        val wm = getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
+        // 3. User switched to a normal, non-blocked app -> Hide Overlay
         BlockOverlayManager.removeOverlay(wm)
     }
 

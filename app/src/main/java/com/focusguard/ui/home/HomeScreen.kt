@@ -183,34 +183,24 @@ fun FocusGuardHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(64.dp)
             .background(bgColor)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector         = Icons.Default.Shield,
-                contentDescription  = "FocusGuard",
-                tint                = Seg1,
-                modifier            = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text       = "FocusGuard",
-                fontWeight = FontWeight.Bold,
-                fontSize   = 18.sp,
-                color      = textColor
-            )
-        }
-        IconButton(onClick = onThemeToggle) {
-            Icon(
-                imageVector         = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                contentDescription  = "Toggle theme",
-                tint                = Seg1,
-                modifier            = Modifier.size(22.dp)
-            )
-        }
+        Icon(
+            imageVector         = Icons.Default.Shield,
+            contentDescription  = "FocusGuard",
+            tint                = Seg1,
+            modifier            = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text       = "FocusGuard",
+            fontWeight = FontWeight.Bold,
+            fontSize   = 18.sp,
+            color      = textColor
+        )
     }
 }
 
