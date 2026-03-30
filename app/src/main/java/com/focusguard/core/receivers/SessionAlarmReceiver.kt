@@ -4,29 +4,23 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.focusguard.core.scheduling.SessionScheduler
-import com.focusguard.data.local.SessionStorage
+import com.focusguard.data.local.SessionDataStore
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
 
 class SessionAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return
-        val isStart = intent.getBooleanExtra(EXTRA_IS_START, true)
 
-        val storage = SessionStorage(context)
-        val sessions = storage.getSessions()
-        val session = sessions.find { it.id == sessionId } ?: return
+        // Fetch session cleanly using Coroutines from the new DataStore
+        val sessionDataStore = SessionDataStore(context)
+        val session = runBlocking {
+            sessionDataStore.sessionsFlow.firstOrNull()?.find { it.id == sessionId }
+        } ?: return
 
-        if (isStart) {
-            val now = System.currentTimeMillis()
-            val duration = session.durationMillis()
-            storage.saveActiveSession(session.id, now + duration, session.blockedPackages)
-        } else {
-            if (storage.getActiveSessionId() == sessionId) {
-                storage.clearActiveSession()
-            }
-        }
-
-        // Reschedule for next occurrence
+        // Reschedule for next occurrence without mutating system states 
+        // since the accessibility engine enforces via purely mathematical timeline tracking
         val scheduler = SessionScheduler(context)
         scheduler.scheduleSession(session)
     }

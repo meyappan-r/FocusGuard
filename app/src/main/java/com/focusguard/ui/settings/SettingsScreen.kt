@@ -9,6 +9,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import android.widget.Toast
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +47,60 @@ fun SettingsScreen(
     val surfBg  = FGColors.surf(isDarkMode)
     val txtPri  = FGColors.txtPri(isDarkMode)
     val txtSec  = FGColors.txtSec(isDarkMode)
+
+    val scope = rememberCoroutineScope()
+    var isCheckingUpdates by remember { mutableStateOf(false) }
+    var updateSubtitle by remember { mutableStateOf("You are up to date.") }
+    var showVersionDialog by remember { mutableStateOf(false) }
+
+    if (showVersionDialog) {
+        Dialog(onDismissRequest = { showVersionDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.Shield, 
+                        contentDescription = null, 
+                        tint = txtPri, 
+                        modifier = Modifier.size(52.dp)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text("FocusGuard", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = txtPri)
+                    Text("Version 1.0.0", fontSize = 13.sp, color = txtSec, fontWeight = FontWeight.Medium)
+                    
+                    Spacer(Modifier.height(32.dp))
+                    
+                    TextButton(
+                        onClick = { 
+                            showVersionDialog = false
+                            onNavigateToPrivacy()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("View License", color = txtPri, fontWeight = FontWeight.SemiBold)
+                    }
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    Button(
+                        onClick = { showVersionDialog = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = txtPri, contentColor = bg),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(vertical = 14.dp)
+                    ) {
+                        Text("Close", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                }
+            }
+        }
+    }
 
     DisposableEffect(context) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -143,30 +202,34 @@ fun SettingsScreen(
             item { SectionLabel("ABOUT", txtSec) }
             item {
                 SettingsCard(cardBg = cardBg) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Info, contentDescription = null,
-                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Version", fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp, color = txtPri)
-                            Text("1.0.0 (MVP)", fontSize = 12.sp, color = txtSec)
-                        }
-                    }
+                    ActionRow(
+                        icon     = Icons.Default.Info,
+                        title    = "Version",
+                        subtitle = "1.0.0",
+                        txtPri   = txtPri,
+                        txtSec   = txtSec,
+                        onClick  = { showVersionDialog = true }
+                    )
                     HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp,
                         modifier = Modifier.padding(horizontal = 16.dp))
                     ActionRow(
                         icon     = Icons.Default.SystemUpdate,
                         title    = "Check for Updates",
-                        subtitle = "You are up to date.",
+                        subtitle = updateSubtitle,
                         txtPri   = txtPri,
                         txtSec   = txtSec,
-                        onClick  = { /* Handle update check */ }
+                        onClick  = { 
+                            if (!isCheckingUpdates) {
+                                isCheckingUpdates = true
+                                updateSubtitle = "Checking for updates..."
+                                scope.launch {
+                                    delay(1500)
+                                    isCheckingUpdates = false
+                                    updateSubtitle = "You are up to date."
+                                    Toast.makeText(context, "No updates available", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     )
                     HorizontalDivider(color = FGColors.track(isDarkMode), thickness = 0.5.dp,
                         modifier = Modifier.padding(horizontal = 16.dp))

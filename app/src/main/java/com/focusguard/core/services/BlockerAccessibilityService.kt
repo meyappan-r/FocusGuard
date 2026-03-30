@@ -4,105 +4,174 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import com.focusguard.data.local.FocusSession
 import com.focusguard.data.local.LimitManager
-import com.focusguard.data.local.SessionStorage
+import com.focusguard.data.local.SessionDataStore
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 class BlockerAccessibilityService : AccessibilityService() {
 
     private lateinit var limitManager: LimitManager
-    private lateinit var sessionStorage: SessionStorage
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private lateinit var sessionDataStore: SessionDataStore
+    
+    // The core of the new system: in-memory cache directly mirrored from DataStore 
+    // This allows absolutely zero-latency blocks on app switch.
+    @Volatile
+    private var activeSessionsCache: List<FocusSession> = emptyList()
+
+    @Volatile
+    private var activeBreakExpiryCache: Long = 0L
+
+    @Volatile
+    private var limitReachedCache: Set<String> = emptySet()
+
+    private val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+        Log.e(TAG, "Coroutine crash: ${exception.message}", exception)
+    }
+    
+    // Launch an observation scope bound to the service boundary lifecycle
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + exceptionHandler)
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         limitManager   = LimitManager(this)
-        sessionStorage = SessionStorage(this)
+        sessionDataStore = SessionDataStore(this)
         Log.d(TAG, "Accessibility Service Connected")
+
+        // Hook up the live pipe to the DataStore to continually preload our memory
+        serviceScope.launch {
+            sessionDataStore.sessionsFlow.collect { sessionsList ->
+                Log.d(TAG, "Syncing latest DataStore schema into Accessibility Memory Cache")
+                activeSessionsCache = sessionsList
+            }
+        }
+
+        serviceScope.launch {
+            sessionDataStore.breakExpiryFlow.collect { expiry ->
+                activeBreakExpiryCache = expiry
+            }
+        }
+
+        // Poll UsageStats safely in the background instead of on every UI event
+        serviceScope.launch {
+            while (true) {
+                updateLimitReachedCache()
+                kotlinx.coroutines.delay(10000L) // Check every 10 seconds
+            }
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val packageName = event.packageName?.toString() ?: return
-
-        Log.d("BlockerAccessibility", "Foreground App: $packageName")
-
-        // Run blocking checks in the background to prevent ANRs
-        serviceScope.launch {
-            checkAndBlockIfNeeded(packageName)
-        }
-    }
-
-    private suspend fun checkAndBlockIfNeeded(packageName: String) {
-        val wm = getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
-
-        // Never block FocusGuard itself, remove overlay
-        if (packageName == this.packageName) {
-            BlockOverlayManager.removeOverlay(wm)
-            return
-        }
-
-        // Never block safety-critical apps (dialer, SMS), remove overlay
-        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.NEVER_BLOCKABLE) {
-            BlockOverlayManager.removeOverlay(wm)
-            return
-        }
-
-        // Ignore ALWAYS_HIDDEN (Launchers, SystemUI) to preserve the overlay visibility
-        // after forcing the user to the HOME screen.
-        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.ALWAYS_HIDDEN) return
-
-        // ── 1. Session blocking ───────────────────────────────────────
-        if (sessionStorage.isSessionActive()) {
-            val endTime = sessionStorage.getActiveEndTimeMillis()
-            if (System.currentTimeMillis() >= endTime) {
-                // Session expired → auto-clear
-                Log.d("BlockerAccessibility", "Session expired, clearing.")
-                sessionStorage.clearActiveSession()
-            } else {
-                val blocked = sessionStorage.getActiveBlockedPackages()
-                if (packageName in blocked) {
-                    Log.d("BlockerAccessibility", "Session blocked: $packageName")
-                    withContext(Dispatchers.Main) { performGlobalAction(GLOBAL_ACTION_HOME) }
-                    BlockOverlayManager.showOverlay(this@BlockerAccessibilityService, packageName, "session")
-                    return
-                }
-            }
-        }
-
-        // ── 2. Daily-limit blocking ───────────────────────────────────
-        if (limitManager.hasLimit(packageName)) {
-            val limitMillis = limitManager.getLimit(packageName)
-            // UsageStatsManager causes ANRs if run on main thread
-            val usageMillis = getTodayUsageMillis(packageName)
+        try {
+            if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+            val packageName = event.packageName?.toString() ?: return
             
-            if (usageMillis >= limitMillis) {
-                Log.d("BlockerAccessibility", "Limit exceeded: $packageName ($usageMillis ms >= $limitMillis ms)")
-                withContext(Dispatchers.Main) { performGlobalAction(GLOBAL_ACTION_HOME) }
-                BlockOverlayManager.showOverlay(this@BlockerAccessibilityService, packageName, "limit")
+            if (!::limitManager.isInitialized || !::sessionDataStore.isInitialized) return
+
+            // 1. Perform Sessions check strictly synchronously (zero yield)
+            val blockingSessionName = shouldBlockSynchronously(packageName)
+            if (blockingSessionName != null) {
+                Log.d(TAG, "Synchronous memory block hit: $packageName by $blockingSessionName")
+                launchBlockActivity(packageName, "session", blockingSessionName)
                 return
             }
+            
+            // 2. Perform Limit check strictly synchronously from in-memory cache
+            if (packageName in limitReachedCache) {
+                Log.d(TAG, "Synchronous limit block hit: $packageName")
+                launchBlockActivity(packageName, "limit")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Crash trapped in onAccessibilityEvent", e)
         }
-
-        // 3. User switched to a normal, non-blocked app -> Hide Overlay
-        BlockOverlayManager.removeOverlay(wm)
     }
 
-    private fun getTodayUsageMillis(packageName: String): Long {
-        return runCatching {
-            val usm = getSystemService(USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-            val cal = java.util.Calendar.getInstance().apply {
-                set(java.util.Calendar.HOUR_OF_DAY, 0)
-                set(java.util.Calendar.MINUTE, 0)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
+    private fun shouldBlockSynchronously(packageName: String): String? {
+        // Core exceptions
+        if (packageName == this.packageName) return null
+        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.NEVER_BLOCKABLE) return null
+        if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.ALWAYS_HIDDEN) return null
+
+        val now = LocalDateTime.now()
+        val currentMs = (now.hour * 60 + now.minute) * 60000L + now.second * 1000L
+        val dayOfWeek = now.dayOfWeek.value - 1
+        val dateString = now.format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+        if (System.currentTimeMillis() < activeBreakExpiryCache) {
+            return null // Currently in a temporary break
+        }
+
+        for (session in activeSessionsCache) {
+            val isToday = if (session.repeatEnabled) {
+                session.repeatDays.contains(dayOfWeek)
+            } else {
+                session.oneTimeDate == dateString
             }
+            if (!isToday) continue
+
+            val fromMs = (session.fromHour * 60 + session.fromMinute) * 60000L
+            val toMs = (session.toHour * 60 + session.toMinute) * 60000L
+
+            val isActive = if (toMs > fromMs) {
+                currentMs in fromMs until toMs
+            } else {
+                // Crosses midnight
+                currentMs >= fromMs || currentMs < toMs
+            }
+
+            if (isActive && packageName in session.blockedPackages) {
+                return session.name
+            }
+        }
+        return null
+    }
+
+    private fun updateLimitReachedCache() {
+        val limits = limitManager.getAllLimits()
+        if (limits.isEmpty()) {
+            limitReachedCache = emptySet()
+            return
+        }
+        val usm = getSystemService(USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val cal = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        try {
             val stats = usm.queryAndAggregateUsageStats(cal.timeInMillis, System.currentTimeMillis())
-            stats[packageName]?.totalTimeInForeground ?: 0L
-        }.getOrDefault(0L)
+            val newReached = mutableSetOf<String>()
+            for ((pkg, limit) in limits) {
+                val usage = stats[pkg]?.totalTimeInForeground ?: 0L
+                if (usage >= limit) {
+                    newReached.add(pkg)
+                }
+            }
+            limitReachedCache = newReached
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to poll UsageStats for limits", e)
+        }
+    }
+
+    private fun launchBlockActivity(packageName: String, source: String, sessionName: String? = null) {
+        val intent = Intent(this, BlockActivity::class.java).apply {
+            putExtra("blocked_package", packageName)
+            putExtra("block_source", source)
+            sessionName?.let { putExtra("session_name", it) }
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or 
+                    Intent.FLAG_ACTIVITY_CLEAR_TASK or 
+                    Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+        }
+        startActivity(intent)
     }
 
     override fun onInterrupt() {

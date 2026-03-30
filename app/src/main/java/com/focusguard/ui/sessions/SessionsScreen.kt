@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -77,9 +78,6 @@ fun SessionsScreen(viewModel: SessionsViewModel, isDarkMode: Boolean = false) {
             },
             onEditSession = { s ->
                 nav = SessionNav.CreateEdit(s, isNew = false)
-            },
-            onStartSession = { s ->
-                viewModel.startSession(s)
             }
         )
         is SessionNav.CreateEdit -> CreateSessionScreen(
@@ -118,8 +116,7 @@ fun SessionsMainScreen(
     viewModel: SessionsViewModel,
     isDarkMode: Boolean = false,
     onCreateNew: () -> Unit,
-    onEditSession: (FocusSession) -> Unit,
-    onStartSession: (FocusSession) -> Unit
+    onEditSession: (FocusSession) -> Unit
 ) {
     val sessionsForDay = viewModel.sessionsForSelectedDate()
     val bg    = MaterialTheme.colorScheme.background
@@ -163,15 +160,17 @@ fun SessionsMainScreen(
             item { CalendarWeekStrip(state = state, viewModel = viewModel, isDarkMode = isDarkMode) }
             item { Spacer(modifier = Modifier.height(16.dp)) }
 
-            if (state.isSessionActive) {
+            if (state.activeSession != null) {
                 item {
+                    val isBreakActive = System.currentTimeMillis() < state.activeBreakExpiryMillis
                     ActiveSessionCard(
-                        name            = state.activeSessionName,
-                        emoji           = state.activeSessionEmoji,
+                        name            = state.activeSession.name,
+                        emoji           = state.activeSession.emoji,
                         remainingMillis = state.activeSessionRemainingMillis,
-                        blockedCount    = state.activeSessionBlockedCount,
+                        blockedCount    = state.activeSession.blockedPackages.size,
                         isDarkMode      = isDarkMode,
-                        onStop          = { viewModel.stopSession() }
+                        isBreakActive   = isBreakActive,
+                        onEndBreak      = { viewModel.clearBreak() }
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -185,8 +184,8 @@ fun SessionsMainScreen(
                 }
                 items(sessionsForDay) { s ->
                     SavedSessionCard(session = s, isDarkMode = isDarkMode,
-                        isActive = state.isSessionActive && state.activeSessionName == s.name,
-                        onEdit = { onEditSession(s) }, onStart = { onStartSession(s) })
+                        isActive = state.activeSession?.id == s.id,
+                        onEdit = { onEditSession(s) })
                     Spacer(modifier = Modifier.height(10.dp))
                 }
             }
@@ -198,8 +197,7 @@ fun SessionsMainScreen(
             }
             items(state.suggestedSessions) { s ->
                 SuggestedSessionCard(s = s, isDarkMode = isDarkMode,
-                    onAdd = { val fs = viewModel.newSessionFromSuggested(s); onEditSession(fs) },
-                    onStart = { val fs = viewModel.newSessionFromSuggested(s); viewModel.startSession(fs) })
+                    onAdd = { val fs = viewModel.newSessionFromSuggested(s); onEditSession(fs) })
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
@@ -211,8 +209,8 @@ fun SessionsMainScreen(
                 }
                 items(state.sessions.filter { it !in sessionsForDay }) { s ->
                     SavedSessionCard(session = s, isDarkMode = isDarkMode,
-                        isActive = state.isSessionActive && state.activeSessionName == s.name,
-                        onEdit = { onEditSession(s) }, onStart = { onStartSession(s) })
+                        isActive = state.activeSession?.id == s.id,
+                        onEdit = { onEditSession(s) })
                     Spacer(modifier = Modifier.height(10.dp))
                 }
             }
@@ -257,12 +255,13 @@ fun CalendarWeekStrip(state: SessionsState, viewModel: SessionsViewModel, isDark
             repeat(7) { i ->
                 val date       = weekStart.plusDays(i.toLong())
                 val isToday    = date == today
+                val isPast     = date.isBefore(today)
                 val isSelected = date == state.selectedDate
                 val dayLabel   = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).take(1)
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { viewModel.selectDate(date) }
+                    modifier = Modifier.clickable(enabled = !isPast) { viewModel.selectDate(date) }.alpha(if (isPast) 0.4f else 1f)
                 ) {
                     Text(dayLabel, fontSize = 11.sp, color = txtSec)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -306,7 +305,8 @@ fun ActiveSessionCard(
     remainingMillis: Long,
     blockedCount: Int,
     isDarkMode: Boolean = false,
-    onStop: () -> Unit
+    isBreakActive: Boolean = false,
+    onEndBreak: () -> Unit = {}
 ) {
     val h  = (remainingMillis / 3_600_000).toInt()
     val m  = ((remainingMillis % 3_600_000) / 60_000).toInt()
@@ -348,17 +348,20 @@ fun ActiveSessionCard(
                         fontSize = 12.sp, color = txtSec)
                 }
             }
+            if (isBreakActive) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onEndBreak,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("End Break Early", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onError)
+                }
+            }
             Spacer(modifier = Modifier.height(18.dp))
-            OutlinedButton(
-                onClick  = onStop,
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = FG_Error),
-                border   = androidx.compose.foundation.BorderStroke(1.dp, FG_Error),
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape    = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Stop Session", fontWeight = FontWeight.Bold)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                Text("Enforced by FocusGuard System", fontSize = 11.sp, color = txtSec, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
             }
         }
     }
@@ -368,7 +371,7 @@ fun ActiveSessionCard(
 //  Suggested session card
 // ─────────────────────────────────────────────────────────────────
 @Composable
-fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd: () -> Unit, onStart: () -> Unit) {
+fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd: () -> Unit) {
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
     val surfBg = MaterialTheme.colorScheme.surface
     val txtPri = MaterialTheme.colorScheme.onSurface
@@ -403,7 +406,7 @@ fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd
                     )
                 }
             }
-            IconButton(onClick = onStart) {
+            IconButton(onClick = onAdd) {
                 Icon(Icons.Default.Add, contentDescription = "Add", tint = FG_Seg1)
             }
         }
@@ -418,8 +421,7 @@ fun SavedSessionCard(
     session: FocusSession,
     isActive: Boolean,
     isDarkMode: Boolean = false,
-    onEdit: () -> Unit,
-    onStart: () -> Unit
+    onEdit: () -> Unit
 ) {
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
     val surfBg = MaterialTheme.colorScheme.surface
@@ -452,14 +454,26 @@ fun SavedSessionCard(
                         fontSize = 11.sp, color = FG_Error)
                 }
             }
-            if (!isActive) {
-                FilledIconButton(
-                    onClick = onStart,
-                    colors  = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = FG_Seg1, contentColor = Color.White)
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Start")
+            
+            Column(horizontalAlignment = Alignment.End) {
+                val statusText: String
+                val statusColor: Color
+                if (isActive) {
+                    statusText = "Active"
+                    statusColor = FG_Seg1
+                } else {
+                    val now = java.time.LocalDateTime.now()
+                    val toMs = (session.toHour * 60 + session.toMinute) * 60000L
+                    val currentMs = (now.hour * 60 + now.minute) * 60000L + now.second * 1000L
+                    if (currentMs > toMs) {
+                        statusText = "Completed"
+                        statusColor = txtSec.copy(alpha = 0.5f)
+                    } else {
+                        statusText = "Upcoming"
+                        statusColor = txtSec
+                    }
                 }
+                Text(statusText, fontSize = 12.sp, color = statusColor, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -520,6 +534,19 @@ fun CreateSessionScreen(
         oneTimeDate = oneTimeDate, breakMinutes = breakMinutes,
         blockedPackages = blockedPkgs, description = description
     )
+
+    // Validations
+    val fromMins = fromHour * 60 + fromMinute
+    val toMins = toHour * 60 + toMinute
+    val currentMins = java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute
+    val dateIsToday = !repeatEnabled && oneTimeDate == LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+    val endBeforeStartErr = toMins <= fromMins
+    val pastStartErr = dateIsToday && fromMins < currentMins
+    val noAppsErr = blockedPkgs.isEmpty()
+    val nameErr = name.isBlank()
+
+    val isValid = !endBeforeStartErr && !pastStartErr && !noAppsErr && !nameErr
 
     BackHandler {
         if (isDirty) showDiscard = true else onDiscard()
@@ -611,15 +638,24 @@ fun CreateSessionScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Button(
-                    onClick  = {
-                        if (name.isNotBlank()) onSave(buildSession())
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape    = RoundedCornerShape(28.dp),
-                    enabled  = name.isNotBlank()
-                ) {
-                    Text("Save", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Column {
+                    if (!isValid) {
+                        if (nameErr) Text("• Name cannot be blank", color = FG_Error, fontSize = 12.sp)
+                        if (pastStartErr) Text("• Start time must be in the future", color = FG_Error, fontSize = 12.sp)
+                        if (endBeforeStartErr) Text("• End time must be after start time", color = FG_Error, fontSize = 12.sp)
+                        if (noAppsErr) Text("• Select at least one app to block", color = FG_Error, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Button(
+                        onClick  = {
+                            if (isValid) onSave(buildSession())
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape    = RoundedCornerShape(28.dp),
+                        enabled  = isValid
+                    ) {
+                        Text("Save Schedule", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                 }
             }
         }

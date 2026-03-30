@@ -28,7 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.focusguard.data.datasource.UsageStatsDataSource
 import com.focusguard.data.local.LimitManager
-import com.focusguard.data.local.SessionStorage
+import com.focusguard.data.local.SessionDataStore
 import com.focusguard.data.repository.UsageRepositoryImpl
 import com.focusguard.domain.usecase.GetDailyUsageUseCase
 import androidx.compose.animation.fadeIn
@@ -71,9 +71,9 @@ class MainActivity : ComponentActivity() {
         val homeViewModel    = HomeViewModel(useCase, repository)
         val blocksViewModel  = BlocksViewModel(useCase, limitManager)
 
-        val sessionStorage   = SessionStorage(this)
+        val sessionDataStore = SessionDataStore(this)
         val sessionScheduler = com.focusguard.core.scheduling.SessionScheduler(this)
-        val sessionsViewModel = com.focusguard.ui.sessions.SessionsViewModel(sessionStorage, sessionScheduler)
+        val sessionsViewModel = com.focusguard.ui.sessions.SessionsViewModel(sessionDataStore, sessionScheduler)
 
         val settingsViewModel = androidx.lifecycle.ViewModelProvider(
             this, com.focusguard.ui.settings.SettingsViewModelFactory(this)

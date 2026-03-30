@@ -5,18 +5,21 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.focusguard.core.scheduling.SessionScheduler
 import com.focusguard.data.local.FocusSession
-import com.focusguard.data.local.SessionStorage
+import com.focusguard.data.local.SessionDataStore
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.time.LocalTime
 
 // ── App info for the picker ───────────────────────────────────
 data class AppInfo(
@@ -57,14 +60,13 @@ val DEFAULT_TAGS = listOf(
 data class SessionsState(
     // Calendar
     val selectedDate: LocalDate = LocalDate.now(),
-    val weekOffset: Int = 0,              // 0 = current week
+    val weekOffset: Int = 0,
 
-    // Active session
-    val isSessionActive: Boolean = false,
-    val activeSessionName: String = "",
-    val activeSessionEmoji: String = "",
+    // Active session dynamically computed
+    val activeSession: FocusSession? = null,
     val activeSessionRemainingMillis: Long = 0L,
-    val activeSessionBlockedCount: Int = 0,
+    val activeBreakExpiryMillis: Long = 0L,
+    val allActiveSessions: List<FocusSession> = emptyList(),
 
     // Sessions list
     val sessions: List<FocusSession> = emptyList(),
@@ -75,41 +77,135 @@ data class SessionsState(
 )
 
 class SessionsViewModel(
-    private val sessionStorage: SessionStorage,
-    private val sessionScheduler: com.focusguard.core.scheduling.SessionScheduler
+    private val sessionDataStore: SessionDataStore,
+    private val sessionScheduler: SessionScheduler
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SessionsState())
     val state: StateFlow<SessionsState> = _state
 
-    private var countdownJob: Job? = null
-
     init {
-        loadSessions()
-        restoreActiveSessionIfNeeded()
+        // Collect sessions from the DataStore
+        viewModelScope.launch {
+            sessionDataStore.sessionsFlow.collect { sessionsList ->
+                _state.update { it.copy(sessions = sessionsList) }
+            }
+        }
+        
+        // Collect break expiry
+        viewModelScope.launch {
+            sessionDataStore.breakExpiryFlow.collect { expiry ->
+                _state.update { it.copy(activeBreakExpiryMillis = expiry) }
+            }
+        }
+        
+        // Start a lightweight loop that mathematically evaluates active sessions based on system clock
+        viewModelScope.launch(Dispatchers.Default) {
+            while (true) {
+                evaluateActiveSession()
+                delay(1000L) // Refresh every second
+            }
+        }
+    }
+
+    fun clearBreak() {
+        viewModelScope.launch {
+            sessionDataStore.clearBreak()
+        }
+    }
+
+    private fun evaluateActiveSession() {
+        val now = LocalDateTime.now()
+        val currentSessions = _state.value.sessions
+        var primaryActive: FocusSession? = null
+        var primaryRemaining = 0L
+        val activeList = mutableListOf<FocusSession>()
+
+        for (session in currentSessions) {
+            val (isActive, remainingMs) = checkSessionActiveStatus(session, now)
+            if (isActive) {
+                activeList.add(session)
+                if (primaryActive == null || remainingMs < primaryRemaining) {
+                    primaryActive = session
+                    primaryRemaining = remainingMs
+                }
+            }
+        }
+
+        _state.update {
+            it.copy(
+                activeSession = primaryActive,
+                activeSessionRemainingMillis = primaryRemaining,
+                allActiveSessions = activeList
+            )
+        }
+    }
+
+    private fun checkSessionActiveStatus(session: FocusSession, now: LocalDateTime): Pair<Boolean, Long> {
+        val dayOfWeek = now.dayOfWeek.value - 1
+        val isToday = if (session.repeatEnabled) {
+            session.repeatDays.contains(dayOfWeek)
+        } else {
+            session.oneTimeDate == now.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        }
+        
+        if (!isToday) return false to 0L
+
+        val fromMs = (session.fromHour * 60 + session.fromMinute) * 60000L
+        val toMs = (session.toHour * 60 + session.toMinute) * 60000L
+        val currentMs = (now.hour * 60 + now.minute) * 60000L + now.second * 1000L
+
+        val isActive = if (toMs > fromMs) {
+            currentMs in fromMs until toMs
+        } else {
+            // Crosses midnight
+            currentMs >= fromMs || currentMs < toMs
+        }
+
+        if (!isActive) return false to 0L
+
+        // Calculate remaining correctly whether crossing midnight or not
+        val remaining = if (toMs > fromMs) {
+            toMs - currentMs
+        } else {
+            if (currentMs >= fromMs) {
+                // before midnight
+                (24 * 60 * 60000L - currentMs) + toMs
+            } else {
+                // after midnight
+                toMs - currentMs
+            }
+        }
+        return true to remaining
     }
 
     // ── Sessions CRUD ─────────────────────────────────────────
 
-    private fun loadSessions() {
-        _state.value = _state.value.copy(sessions = sessionStorage.getSessions())
-    }
-
     fun saveSession(session: FocusSession) {
-        val current = sessionStorage.getSessions().toMutableList()
-        val idx = current.indexOfFirst { it.id == session.id }
-        if (idx >= 0) current[idx] = session else current.add(session)
-        sessionStorage.saveSessions(current)
-        _state.value = _state.value.copy(sessions = current.toList())
-        sessionScheduler.scheduleSession(session)
+        viewModelScope.launch {
+            val current = _state.value.sessions.toMutableList()
+            val idx = current.indexOfFirst { it.id == session.id }
+            if (idx >= 0) current[idx] = session else current.add(session)
+            
+            // Push to DataStore
+            sessionDataStore.saveSessions(current)
+            
+            // Update scheduling triggers
+            sessionScheduler.scheduleSession(session)
+        }
     }
 
     fun deleteSession(id: String) {
-        val sessionToDelete = sessionStorage.getSessions().find { it.id == id }
-        val updated = sessionStorage.getSessions().filter { it.id != id }
-        sessionStorage.saveSessions(updated)
-        _state.value = _state.value.copy(sessions = updated)
-        sessionToDelete?.let { sessionScheduler.cancelSession(it) }
+        viewModelScope.launch {
+            val sessionToDelete = _state.value.sessions.find { it.id == id }
+            val updated = _state.value.sessions.filter { it.id != id }
+            
+            // Push to DataStore
+            sessionDataStore.saveSessions(updated)
+            
+            // Cancel background alarms
+            sessionToDelete?.let { sessionScheduler.cancelSession(it) }
+        }
     }
 
     fun newSessionFromSuggested(s: SuggestedSession): FocusSession = FocusSession(
@@ -142,103 +238,26 @@ class SessionsViewModel(
             toMinute        = 0,
             repeatEnabled   = false,
             repeatDays      = emptySet(),
-            oneTimeDate     = LocalDate.now()
-                .format(DateTimeFormatter.ISO_LOCAL_DATE),
+            oneTimeDate     = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
             breakMinutes    = 5,
             blockedPackages = emptySet(),
             description     = ""
         )
     }
 
-    // ── Active session control ────────────────────────────────
-
-    fun startSession(session: FocusSession) {
-        val durationMs = session.durationMillis()
-        val endTime    = System.currentTimeMillis() + durationMs
-
-        sessionStorage.saveActiveSession(session.id, endTime, session.blockedPackages)
-
-        _state.value = _state.value.copy(
-            isSessionActive              = true,
-            activeSessionName            = session.name,
-            activeSessionEmoji           = session.emoji,
-            activeSessionRemainingMillis = durationMs,
-            activeSessionBlockedCount    = session.blockedPackages.size
-        )
-
-        startCountdown(durationMs)
-    }
-
-    fun stopSession() {
-        sessionStorage.clearActiveSession()
-        countdownJob?.cancel()
-        _state.value = _state.value.copy(
-            isSessionActive              = false,
-            activeSessionName            = "",
-            activeSessionEmoji           = "",
-            activeSessionRemainingMillis = 0L,
-            activeSessionBlockedCount    = 0
-        )
-    }
-
-    private fun startCountdown(durationMs: Long) {
-        countdownJob?.cancel()
-        countdownJob = viewModelScope.launch {
-            var remaining = durationMs
-            while (remaining > 0) {
-                delay(1_000L)
-                remaining -= 1_000L
-                _state.value = _state.value.copy(
-                    activeSessionRemainingMillis = remaining.coerceAtLeast(0L)
-                )
-            }
-            // Auto-expire
-            sessionStorage.clearActiveSession()
-            _state.value = _state.value.copy(
-                isSessionActive              = false,
-                activeSessionName            = "",
-                activeSessionEmoji           = "",
-                activeSessionRemainingMillis = 0L,
-                activeSessionBlockedCount    = 0
-            )
-        }
-    }
-
-    private fun restoreActiveSessionIfNeeded() {
-        if (!sessionStorage.isSessionActive()) return
-        val endTime  = sessionStorage.getActiveEndTimeMillis()
-        val remaining = endTime - System.currentTimeMillis()
-        if (remaining <= 0) {
-            sessionStorage.clearActiveSession()
-            return
-        }
-        val sessionId = sessionStorage.getActiveSessionId()
-        val session   = sessionStorage.getSessions().firstOrNull { it.id == sessionId }
-        _state.value = _state.value.copy(
-            isSessionActive              = true,
-            activeSessionName            = session?.name ?: "Focus Session",
-            activeSessionEmoji           = session?.emoji ?: "⏱️",
-            activeSessionRemainingMillis = remaining,
-            activeSessionBlockedCount    = sessionStorage.getActiveBlockedPackages().size
-        )
-        startCountdown(remaining)
-    }
-
     // ── Calendar ──────────────────────────────────────────────
 
     fun selectDate(date: LocalDate) {
-        _state.value = _state.value.copy(selectedDate = date)
+        _state.update { it.copy(selectedDate = date) }
     }
 
     fun navigateWeek(offset: Int) {
-        val newOffset = _state.value.weekOffset + offset
-        _state.value = _state.value.copy(weekOffset = newOffset)
+        _state.update { it.copy(weekOffset = it.weekOffset + offset) }
     }
 
-    /** Sessions that match the currently selected date */
     fun sessionsForSelectedDate(): List<FocusSession> {
         val date       = _state.value.selectedDate
-        val dayOfWeek  = date.dayOfWeek.value - 1  // Mon=0 … Sun=6
+        val dayOfWeek  = date.dayOfWeek.value - 1 
         val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
         return _state.value.sessions.filter { s ->
             if (s.repeatEnabled) dayOfWeek in s.repeatDays
@@ -254,8 +273,8 @@ class SessionsViewModel(
             val apps = withContext(Dispatchers.IO) {
                 val pm = context.packageManager
                 pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                    .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }   // user apps only
-                    .filter { it.packageName != context.packageName }            // exclude FocusGuard
+                    .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }   
+                    .filter { it.packageName != context.packageName }          
                     .mapNotNull { info ->
                         runCatching {
                             AppInfo(
@@ -266,7 +285,7 @@ class SessionsViewModel(
                     }
                     .sortedBy { it.appName }
             }
-            _state.value = _state.value.copy(installedApps = apps)
+            _state.update { it.copy(installedApps = apps) }
         }
     }
 }
