@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+LEARN.md
+learn_part*.md
