@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
+    <!-- Primary Tonal Greens -->
+    <color name="FG_Seg0">#0D3B2E</color>
+    <color name="FG_Seg1">#1A5C45</color>
+    <color name="FG_Seg2">#2E7D5A</color>
+    <color name="FG_Seg3">#4A9B72</color>
+    <color name="FG_SegOther">#ADD4BC</color>
+
+    <color name="FG_BgDark">#000000</color>
+    <color name="FG_BgLight">#F4F6F4</color>
+    
+    <!-- White / Text -->
     <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
 </resources>

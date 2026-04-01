@@ -54,7 +54,8 @@ class SettingsViewModel(private val context: Context) : ViewModel() {
                 context.packageName
             )
         } else {
-            appOps.checkOpNoThrow(
+            androidx.core.app.AppOpsManagerCompat.noteOpNoThrow(
+                context,
                 AppOpsManager.OPSTR_GET_USAGE_STATS,
                 android.os.Process.myUid(),
                 context.packageName

@@ -43,12 +43,12 @@ class BlockerAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         limitManager   = LimitManager(this)
         sessionDataStore = SessionDataStore(this)
-        Log.d(TAG, "Accessibility Service Connected")
+
 
         // Hook up the live pipe to the DataStore to continually preload our memory
         serviceScope.launch {
             sessionDataStore.sessionsFlow.collect { sessionsList ->
-                Log.d(TAG, "Syncing latest DataStore schema into Accessibility Memory Cache")
+
                 activeSessionsCache = sessionsList
             }
         }
@@ -78,14 +78,14 @@ class BlockerAccessibilityService : AccessibilityService() {
             // 1. Perform Sessions check strictly synchronously (zero yield)
             val blockingSessionName = shouldBlockSynchronously(packageName)
             if (blockingSessionName != null) {
-                Log.d(TAG, "Synchronous memory block hit: $packageName by $blockingSessionName")
+
                 launchBlockActivity(packageName, "session", blockingSessionName)
                 return
             }
             
             // 2. Perform Limit check strictly synchronously from in-memory cache
             if (packageName in limitReachedCache) {
-                Log.d(TAG, "Synchronous limit block hit: $packageName")
+
                 launchBlockActivity(packageName, "limit")
             }
             
@@ -175,7 +175,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        Log.d(TAG, "Accessibility Service Interrupted")
+
     }
 
     companion object {

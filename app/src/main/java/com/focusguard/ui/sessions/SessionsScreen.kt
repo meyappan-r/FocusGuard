@@ -729,7 +729,7 @@ fun CreateSessionScreen(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     FormRow(label = "To", onClick = { showToPicker = true }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("%02d:%02d %s".format(
@@ -740,7 +740,7 @@ fun CreateSessionScreen(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
                     // ── Date row (only when repeat is OFF)
                     if (!repeatEnabled) {
@@ -754,7 +754,7 @@ fun CreateSessionScreen(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                        androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     }
 
                     // ── Repeat toggle
@@ -805,7 +805,7 @@ fun CreateSessionScreen(
                         }
                     }
 
-                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     FormRow(label = "Break", onClick = { showBreakPicker = true }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("$breakMinutes mins", style = MaterialTheme.typography.bodyMedium)
@@ -1049,7 +1049,7 @@ fun TagPickerSheet(
                     Text("Select Tag", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = null) }
                 }
-                Divider()
+                androidx.compose.material3.HorizontalDivider()
                 DEFAULT_TAGS.forEach { t ->
                     val parsed = runCatching { android.graphics.Color.parseColor(t.colorHex) }.getOrDefault(0xFF888888.toInt())
                     Row(
@@ -1067,7 +1067,7 @@ fun TagPickerSheet(
                             color = Color(parsed), fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f))
                     }
-                    Divider()
+                    androidx.compose.material3.HorizontalDivider()
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }

@@ -4,7 +4,6 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import android.os.Bundle
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
@@ -18,6 +17,7 @@ class BlockActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.block_overlay)
 
         val packageName = intent.getStringExtra("blocked_package") ?: return

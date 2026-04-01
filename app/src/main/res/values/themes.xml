@@ -1,16 +1,21 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.FocusGuard" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/FG_Seg0</item>
+        <item name="colorPrimaryDark">@color/FG_Seg1</item>
+        <item name="colorAccent">@color/FG_Seg2</item>
     </style>
 
     <style name="Theme.FocusGuard" parent="Base.Theme.FocusGuard" />
 
-    <!-- Used by BlockActivity to appear as a floating overlay -->
-    <style name="Theme.FocusGuard.Translucent" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Used by BlockActivity to appear as a floating overlay edge-to-edge -->
+    <style name="Theme.FocusGuard.Translucent" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>

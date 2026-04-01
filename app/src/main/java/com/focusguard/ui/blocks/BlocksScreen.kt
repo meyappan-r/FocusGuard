@@ -1,3 +1,5 @@
+@file:Suppress("SpellCheckingInspection")
+
 package com.focusguard.ui.blocks
 
 import android.graphics.drawable.Drawable
