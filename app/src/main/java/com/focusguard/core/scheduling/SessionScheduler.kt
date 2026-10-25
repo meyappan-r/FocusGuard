@@ -20,10 +20,10 @@ class SessionScheduler(private val context: Context) {
         val nextEnd = calculateNextTrigger(session, isStart = false)
 
         if (nextStart != null) {
-            setExactAlarm(session.id.hashCode(), nextStart, session.id, true)
+            scheduleAlarm(session.id.hashCode(), nextStart, session.id, true)
         }
         if (nextEnd != null) {
-            setExactAlarm(session.id.hashCode() + 1, nextEnd, session.id, false)
+            scheduleAlarm(session.id.hashCode() + 1, nextEnd, session.id, false)
         }
     }
 
@@ -43,7 +43,7 @@ class SessionScheduler(private val context: Context) {
         alarmManager.cancel(pendingIntentEnd)
     }
 
-    private fun setExactAlarm(requestCode: Int, triggerTimeMillis: Long, sessionId: String, isStart: Boolean) {
+    private fun scheduleAlarm(requestCode: Int, triggerTimeMillis: Long, sessionId: String, isStart: Boolean) {
         val intent = Intent(context, SessionAlarmReceiver::class.java).apply {
             putExtra(SessionAlarmReceiver.EXTRA_SESSION_ID, sessionId)
             putExtra(SessionAlarmReceiver.EXTRA_IS_START, isStart)
@@ -54,29 +54,12 @@ class SessionScheduler(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
-                !alarmManager.canScheduleExactAlarms()
-            ) {
-                setInexactAlarm(triggerTimeMillis, pendingIntent)
-            } else {
-                setExactCompat(triggerTimeMillis, pendingIntent)
-            }
-        } catch (e: SecurityException) {
-            // Fallback if permission revoked
-            setInexactAlarm(triggerTimeMillis, pendingIntent)
-        }
+        // Whether a session is active is decided by the clock at event time; the alarm only re-arms
+        // the next occurrence, so an inexact alarm is enough and no exact-alarm permission is needed.
+        setInexactAlarm(triggerTimeMillis, pendingIntent)
     }
 
-    // The AllowWhileIdle variants only exist from API 23 (minSdk is 21).
-    private fun setExactCompat(triggerTimeMillis: Long, pendingIntent: PendingIntent) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
-        } else {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
-        }
-    }
-
+    // The AllowWhileIdle variant only exists from API 23 (minSdk is 21).
     private fun setInexactAlarm(triggerTimeMillis: Long, pendingIntent: PendingIntent) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
