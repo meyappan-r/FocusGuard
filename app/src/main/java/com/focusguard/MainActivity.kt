@@ -3,9 +3,11 @@ package com.focusguard
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
@@ -21,6 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -70,6 +75,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         // ViewModels outlive this Activity across rotation, so everything they reference
         // must be built from the application context, never from `this`.
@@ -155,8 +161,6 @@ fun FocusGuardApp(
     if (!view.isInEditMode) {
         androidx.compose.runtime.SideEffect {
             val window = (view.context as android.app.Activity).window
-            window.statusBarColor = bg.toArgb()
-            window.navigationBarColor = bg.toArgb()
             val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
             controller.isAppearanceLightStatusBars = !isDarkMode
             controller.isAppearanceLightNavigationBars = !isDarkMode
@@ -195,6 +199,8 @@ fun FocusGuardApp(
         colorScheme = colorScheme
     ) {
         Scaffold(
+            // Each screen's own top bar handles the status-bar inset; the bottom bar handles the navigation bar
+            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 NavigationBar(
                     containerColor = bg,
@@ -231,7 +237,8 @@ fun FocusGuardApp(
             NavHost(
                 navController    = navController,
                 startDestination = Screen.Home.route,
-                modifier         = Modifier.padding(innerPadding),
+                modifier         = Modifier.padding(innerPadding)
+                    .consumeWindowInsets(innerPadding),
                 enterTransition  = { slideInHorizontally(initialOffsetX = { 50 }) + fadeIn() },
                 exitTransition   = { slideOutHorizontally(targetOffsetX = { -50 }) + fadeOut() },
                 popEnterTransition = { slideInHorizontally(initialOffsetX = { -50 }) + fadeIn() },

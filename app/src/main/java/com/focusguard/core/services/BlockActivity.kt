@@ -20,6 +20,21 @@ class BlockActivity : AppCompatActivity() {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.block_overlay)
 
+        // Predictive back (targetSdk 36) no longer calls onBackPressed(); use the dispatcher instead
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() = goHomeAndFinish()
+        })
+
+        // Edge-to-edge: keep the buttons clear of the gesture/navigation bar
+        findViewById<android.view.View>(R.id.blockSheet)?.let { sheet ->
+            val basePadding = sheet.paddingBottom
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(sheet) { v, insets ->
+                val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, basePadding + bars.bottom)
+                insets
+            }
+        }
+
         val packageName = intent.getStringExtra("blocked_package") ?: return
         val source = intent.getStringExtra("block_source") ?: return
         val sessionName = intent.getStringExtra("session_name")
@@ -87,9 +102,5 @@ class BlockActivity : AppCompatActivity() {
         }
         startActivity(homeIntent)
         finish()
-    }
-
-    override fun onBackPressed() {
-        goHomeAndFinish()
     }
 }

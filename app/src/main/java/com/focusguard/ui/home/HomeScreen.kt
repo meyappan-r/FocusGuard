@@ -184,8 +184,9 @@ fun FocusGuardHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp)
             .background(bgColor)
+            .statusBarsPadding()
+            .height(64.dp)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

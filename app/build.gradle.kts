@@ -17,7 +17,7 @@ android {
     defaultConfig {
         applicationId = "com.focusguard"
         minSdk = 21
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 4
         versionName = "0.5"
 
