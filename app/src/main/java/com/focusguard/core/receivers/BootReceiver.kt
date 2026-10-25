@@ -88,7 +88,7 @@ class BootReceiver : BroadcastReceiver() {
         )
 
         val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("FocusGuard Disabled")
             .setContentText("Accessibility service is disabled. Tap to enable and resume app blocking.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

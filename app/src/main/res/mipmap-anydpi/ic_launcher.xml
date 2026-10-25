@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Pre-Android 8 launchers cannot mask adaptive icons, so this is a flat circular icon. -->
+    <path
+        android:fillColor="#1A5C45"
+        android:pathData="M54,0a54,54 0 1,0 0,108a54,54 0 1,0 0,-108z" />
+    <path
+        android:pathData="M41.66,70.99A21,21 0 0 1 39.95,38.39"
+        android:strokeColor="#F4FBF7"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M42.56,36.39A21,21 0 0 1 67.50,37.91"
+        android:strokeColor="#9ED8B8"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M69.85,40.22A21,21 0 0 1 74.99,54.73"
+        android:strokeColor="#5FB88A"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M74.61,58.01A21,21 0 0 1 68.05,69.61"
+        android:strokeColor="#2E7D5A"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#F4FBF7"
+        android:pathData="M48,54a6,6 0 1,0 12,0a6,6 0 1,0 -12,0z" />
+</vector>
