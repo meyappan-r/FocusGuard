@@ -1,9 +1,8 @@
 # Architecture
 
 How FocusGuard is actually built, why it is built that way, and where the design is weak.
-Evidence tags are explained in the [docs index](README.md#evidence-tags). Each tag below was
-checked against the source at commit `6ff1a61` plus the uncommitted working-tree edits
-described in the [index](README.md#baseline).
+Evidence tags are explained in the [docs index](README.md#evidence-tags); what the docs cover
+(and one working-tree caveat) is described [there](README.md#what-the-docs-describe).
 
 For file-by-file detail see [CODEBASE_WALKTHROUGH.md](CODEBASE_WALKTHROUGH.md); for the
 platform concepts (AccessibilityService, DataStore, coroutines...) see

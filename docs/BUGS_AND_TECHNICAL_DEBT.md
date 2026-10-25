@@ -259,4 +259,4 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 | 2026-10-25 | B-001 | `fix: enable core library desugaring and guard API 23 alarm calls` | Fixed; lint `NewApi` 85 -> 0 |
 | 2026-10-25 | B-008 | `fix: stop blocking the main thread in receivers and cancel the service scope` | Fixed; receiver re-arm verified on emulator |
 
-After these changes: `testDebugUnitTest` runs 25 tests (24 new plus the template test), all passing; `lintDebug` reports **1 error** (`MissingSuperCall` in `BlockActivity.onBackPressed`, in code with uncommitted edits by the author), down from 93.
+After these changes: `testDebugUnitTest` runs 25 tests (24 new plus the template test), all passing; `lintDebug` reports **1 error** (`MissingSuperCall` in `BlockActivity.onBackPressed`, in a file with uncommitted working-tree edits, left untouched), down from 93.
