@@ -55,20 +55,24 @@ Concepts: [permissions](ANDROID_CONCEPTS.md#permissions-and-special-access), [Ac
    running) the service's `activeSessionsCache` - this is how the service learns about the session
    immediately, without a broadcast.
 
-There is no UI path to delete or disable a session: `SessionsViewModel.deleteSession` has no callers
-([B-023](BUGS_AND_TECHNICAL_DEBT.md#b-023)).
+To remove a saved session, open it from the list; the edit screen shows **Delete Schedule** (only for sessions
+already in storage) with a confirmation dialog, which calls `SessionsViewModel.deleteSession` -> DataStore rewrite +
+`SessionScheduler.cancelSession` ([B-023](BUGS_AND_TECHNICAL_DEBT.md#b-023), fixed). There is still no
+enable/disable switch.
 
 ### A3. A block actually happening
 
 1. User opens app X. Android sends `TYPE_WINDOW_STATE_CHANGED` to the service
    (`res/xml/accessibility_service_config.xml` subscribes only to that type and sets
    `canRetrieveWindowContent="false"`, so the service sees package names, not screen text).
-2. `onAccessibilityEvent` (main thread) -> `shouldBlockSynchronously(pkg)`:
+2. `onAccessibilityEvent` (main thread): first, if Settings > "Enable App Blocking" is off
+   (`BlockingPreference.isEnabled`), return. Then `shouldBlockSynchronously(pkg)`:
    - skip own package, `NEVER_BLOCKABLE`, `ALWAYS_HIDDEN`;
    - if `now < activeBreakExpiryCache` -> no session block;
-   - for each cached session: is *today* an active day (`repeatDays` contains weekday index 0=Mon,
-     or `oneTimeDate == today`)? is `now` in `[from, to)` (wrapping if `to <= from`)? is `pkg` in
-     `blockedPackages`? -> return the session name.
+   - for each cached session: `session.remainingMillisAt(now) != null` (today is an active day -
+     `repeatDays` contains weekday index 0=Mon, or `oneTimeDate == today` - and `now` is in `[from, to)`,
+     wrapping if `to <= from`; see `domain/rules/SessionRules.kt`) **and** `pkg` is in `blockedPackages`
+     -> return the session name.
 3. If no session matched, check `pkg in limitReachedCache` (filled by the 10-second poll,
    `updateLimitReachedCache`, which compares `queryAndAggregateUsageStats(startOfDay, now)[pkg].totalTimeInForeground`
    with the stored limit).
@@ -121,7 +125,8 @@ notification permission ([B-015](BUGS_AND_TECHNICAL_DEBT.md#b-015)).
 ### `MainActivity.kt`
 
 - `sealed class Screen(route, title, icon)` - four `object`s: Home, Blocks, Sessions, Settings.
-- `MainActivity : ComponentActivity` - `onCreate` (wiring), `onNewIntent` (`setIntent` only; the route
+- `MainActivity : ComponentActivity` - `onCreate` (builds collaborators from `applicationContext` and obtains all four
+  ViewModels via `ViewModelProvider`; [B-002](BUGS_AND_TECHNICAL_DEBT.md#b-002)), `onNewIntent` (`setIntent` only; the route
   extra is read once in `onCreate`, so a `navigate_to` delivered to a live instance is not applied.
   `BlockActivity` starts it with `FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TOP`; because
   `MainActivity` uses the default launch mode, `CLEAR_TOP` finishes and recreates the existing
@@ -139,8 +144,8 @@ notification permission ([B-015](BUGS_AND_TECHNICAL_DEBT.md#b-015)).
 | `activeSessionsCache`, `activeBreakExpiryCache`, `limitReachedCache` | `@Volatile` snapshots read on the main thread |
 | `serviceScope` | `CoroutineScope(SupervisorJob() + Dispatchers.IO + exceptionHandler)`; **never cancelled** ([B-008](BUGS_AND_TECHNICAL_DEBT.md#b-008)) |
 | `onServiceConnected` | creates `LimitManager`, `SessionDataStore`; launches 2 collectors + the 10 s `while(true)` poll |
-| `onAccessibilityEvent` | filter event type, call the two checks, launch `BlockActivity`; everything in `try/catch` |
-| `shouldBlockSynchronously` | session predicate (see A3) |
+| `onAccessibilityEvent` | filter event type, honour the "Enable App Blocking" switch, call the two checks, launch `BlockActivity`; everything in `try/catch` |
+| `shouldBlockSynchronously` | exemptions + break + `remainingMillisAt` per session (see A3) |
 | `updateLimitReachedCache` | limit poll via `queryAndAggregateUsageStats` |
 | `onInterrupt` | empty |
 

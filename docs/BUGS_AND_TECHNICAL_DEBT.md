@@ -1,9 +1,9 @@
 # Bugs and Technical Debt
 
-The single authoritative list of defects, risks and debt. Nothing here has been fixed yet; every
-entry is `Open`. Entries come from reading the source and from running Android lint
-(`./gradlew lintDebug`). **No entry was reproduced on a device**, so "Confirmed" below means
-"proven from source or tooling output", not "seen failing at runtime".
+The single authoritative list of defects, risks and debt. Entries come from reading the source,
+from running Android lint (`./gradlew lintDebug`) and from runs on an Android 16 (API 36) emulator.
+Status is `Open` unless marked `Fixed`; see the [fix log](#fix-log). "Confirmed" means "proven from
+source or tooling output"; only entries marked *Reproduced* were seen failing at runtime (B-002, B-003).
 
 **Confidence scale:** *Confirmed* (the code or tool output proves it) · *Reproduced* (seen failing at
 runtime - none yet) · *Strongly suspected* (follows from documented platform behaviour, not yet run) ·
@@ -18,18 +18,18 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 | ID | Sev | Confidence | Title |
 |---|---|---|---|
 | [B-001](#b-001) | High | Confirmed (lint) | `java.time` used on `minSdk 21` without desugaring |
-| [B-002](#b-002) | High | Strongly suspected | ViewModels bypass the ViewModelStore; infinite loops never cancelled |
+| [B-002](#b-002) | High | **Reproduced** - *Fixed* | ViewModels bypass the ViewModelStore; infinite loops never cancelled |
 | [B-007](#b-007) | High | Confirmed | Signing passwords hardcoded in tracked `build.gradle.kts` |
-| [B-003](#b-003) | Medium | Confirmed | "Enable App Blocking" setting is not enforced |
+| [B-003](#b-003) | Medium | **Reproduced** - *Fixed* | "Enable App Blocking" setting is not enforced |
 | [B-005](#b-005) | Medium | Strongly suspected | A break does not suppress *limit* blocks |
 | [B-006](#b-006) | Medium | Needs verification | Home usage and limit enforcement use different algorithms |
 | [B-008](#b-008) | Medium | Strongly suspected | `runBlocking` in receivers; service scope never cancelled |
-| [B-009](#b-009) | Medium | Confirmed (lint) | `SettingsViewModel` retains an Activity |
+| [B-009](#b-009) | Medium | Confirmed (lint) - *Fixed* | `SettingsViewModel` retains an Activity |
 | [B-010](#b-010) | Medium | Confirmed | Block screen: blank-screen path, ignores `breakMinutes`, `onBackPressed` lint error |
 | [B-011](#b-011) | Medium | Strongly suspected | App picker hides pre-installed (FLAG_SYSTEM) apps |
 | [B-013](#b-013) | Medium | Confirmed | No real automated tests |
 | [B-015](#b-015) | Medium | Strongly suspected | `POST_NOTIFICATIONS` never requested |
-| [B-023](#b-023) | Medium | Confirmed | Sessions cannot be deleted or disabled from the UI |
+| [B-023](#b-023) | Medium | Confirmed - *Fixed (delete)* | Sessions cannot be deleted or disabled from the UI |
 | [B-004](#b-004) | Low | Strongly suspected | Midnight-crossing sessions: wrong-day check + UI forbids them |
 | [B-012](#b-012) | Low | Confirmed | Alarm subsystem does no enforcement; request-code collisions possible |
 | [B-014](#b-014) | Low | Confirmed | Layering / duplication debt |
@@ -45,7 +45,7 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 
 ## <a id="b-001"></a>B-001 - `java.time` on `minSdk 21` without core-library desugaring
 
-- **Severity / confidence:** High / Confirmed by lint (92 `NewApi` errors), not run on an API 21-25 device.
+- **Severity / confidence:** High / Confirmed by lint (85 `NewApi` errors after the session rule was de-duplicated; 92 before), not run on an API 21-25 device.
 - **Where:** `SessionScheduler`, `BlockerAccessibilityService`, `SessionsViewModel`, `SessionsScreen`, `SessionDataStore`.
 - **Evidence:** `./gradlew lintDebug` -> "Call requires API level 26, or core library desugaring (current min is 21)".
   `app/build.gradle.kts` has `minSdk = 21` and no `isCoreLibraryDesugaringEnabled`. The build passes only
@@ -59,38 +59,39 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 
 ## <a id="b-002"></a>B-002 - ViewModels created without a `ViewModelStore`; loops never cancelled
 
-- **Severity / confidence:** High / Strongly suspected.
+- **Severity / confidence:** High / Reproduced on an emulator.
 - **Where:** `MainActivity.onCreate` (plain constructors for Home/Blocks/Sessions); `SessionsViewModel.init`.
 - **Evidence:** three ViewModels are built with `HomeViewModel(...)`, `BlocksViewModel(...)`, `SessionsViewModel(...)`; none uses
   `ViewModelProvider`/`viewModels`. `AndroidManifest` has no `configChanges`. `SessionsViewModel.init` launches two collectors
   and a `while (true) { ...; delay(1000L) }` loop in `viewModelScope`.
 - **Impact:** **[I]** Rotation or theme change recreates the Activity: screen state resets and a new set of three
   coroutines starts while the old set keeps running (nothing calls `onCleared`). CPU/battery drain and leaked references grow with each recreation.
-- **Repro (to run):** rotate the device 10x on the Sessions tab, then count `SessionsViewModel` instances in the Android Studio heap dump.
-- **Remediation:** obtain ViewModels with `by viewModels { Factory }` (one factory per VM, as `SettingsViewModelFactory` already does), and make the loop `while (isActive)`.
-- **Risks:** low; touches `MainActivity` wiring only. **Verify:** heap dump instance count stays 1; state survives rotation.
-- **Status:** Open.
+- **Repro:** emulator (API 36), app open, rotate 12 times via `adb shell settings put system user_rotation`, force a GC (`run-as com.focusguard kill -10 <pid>`), then `adb shell dumpsys meminfo com.focusguard`: **Activities: 9** (3 after the first 6 rotations) - one extra leaked `MainActivity` per rotation.
+- **Fix:** commit "fix: create ViewModels through the ViewModelStore and use application context". ViewModels are now obtained with `ViewModelProvider` + `viewModelFactory { initializer { } }`, and every collaborator is built from `applicationContext` (otherwise a retained ViewModel would hold the Activity through the repository/scheduler). The `delay()` in the 1 Hz loop is cancellable, so no extra change was needed there.
+- **Verified after the fix:** same procedure, 12 rotations -> **Activities: 1**. State retention across rotation and process death were not separately tested.
+- **Status:** Fixed.
 
 ## <a id="b-003"></a>B-003 - "Enable App Blocking" has no effect
 
-- **Severity / confidence:** Medium / Confirmed.
+- **Severity / confidence:** Medium / Reproduced on an emulator.
 - **Where:** `SettingsScreen` ToggleRow ("Pause all limits temporarily."), `SettingsViewModel.toggleBlocking` writing `blocking_enabled`.
 - **Evidence:** `grep -rn "blocking_enabled\|isBlockingEnabled" app/src/main` finds the value only in the Settings UI/ViewModel; neither
   `BlockerAccessibilityService` nor `BlockActivity` reads it.
 - **Impact:** The user believes blocking is paused; it is not. Trust and safety (users trying to access an app urgently).
-- **Remediation:** have the service read `settings_prefs.blocking_enabled` (or move it into DataStore and collect it into a cache like the others) and short-circuit `onAccessibilityEvent`.
-- **Verify:** unit-test the decision function with the flag false; manual: toggle off, open a blocked app.
-- **Status:** Open.
+- **Repro:** emulator, accessibility service enabled, `limit_preferences.xml` giving the Clock app a 1 ms limit, `settings_prefs.xml` with `blocking_enabled=false`: opening Clock still showed `BlockActivity`.
+- **Fix:** commit "fix: make the Enable App Blocking setting pause blocking". New `data/local/BlockingPreference` (file name, key, `isEnabled`) is used by both `SettingsViewModel` and `BlockerAccessibilityService`, which returns early from `onAccessibilityEvent` when the switch is off (this pauses sessions and limits). Stored values are unchanged.
+- **Verified:** same setup, switch off -> Clock opens normally; switch on -> still blocked. Unit tests for the helper (`BlockingPreferenceTest`). Not tested: toggling while a block screen is already showing.
+- **Status:** Fixed.
 
 ## <a id="b-004"></a>B-004 - Midnight-crossing sessions: duplicated predicate, wrong-day check, UI forbids creation
 
 - **Severity / confidence:** Low (latent) / Strongly suspected.
-- **Where:** `BlockerAccessibilityService.shouldBlockSynchronously`, `SessionsViewModel.checkSessionActiveStatus`, `SessionScheduler.calculateNextTrigger`, `CreateSessionScreen` validation.
+- **Where:** `FocusSession.remainingMillisAt` (`domain/rules/SessionRules.kt`, formerly duplicated in `BlockerAccessibilityService.shouldBlockSynchronously` and `SessionsViewModel`), `SessionScheduler.calculateNextTrigger`, `CreateSessionScreen` validation.
 - **Evidence:** the weekday/date check uses *today*, then the time window wraps. For a Monday 22:00-02:00 session, at Tuesday 01:00 "today" is Tuesday, which is not selected, so the window is judged inactive. Separately, `endBeforeStartErr = toMins <= fromMins` stops the UI from ever creating such a session.
 - **Impact:** None today through the UI (cannot create), but the model/service claim to support it; any future relaxation of the UI check will ship a bug. README "Current Limitations" describes this incorrectly.
-- **Remediation:** extract one pure function `isActive(session, now): ActiveState` handling the previous-day case, used by service + ViewModel, with table-driven unit tests. Decide product behaviour (allow midnight sessions or not) first.
-- **Verify:** unit tests for 23:59, 00:00, 00:01, equal from/to, DST days.
-- **Status:** Open.
+- **Progress:** the service and ViewModel copies were merged into `FocusSession.remainingMillisAt` (`domain/rules/SessionRules.kt`) and `SessionRulesTest` pins the current behaviour, including the two "QUIRK" cases. `SessionScheduler.calculateNextTrigger` is still separate.
+- **Remediation:** decide the product behaviour (allow midnight sessions or not), then make `remainingMillisAt` also consider the previous day and update the quirk tests.
+- **Status:** Open (rule centralised and characterised; behaviour unchanged).
 
 ## <a id="b-005"></a>B-005 - A break does not suppress limit blocks
 
@@ -131,8 +132,9 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 - **Severity / confidence:** Medium / Confirmed by lint (`StaticFieldLeak`) and code.
 - **Where:** `SettingsViewModelFactory(this)` in `MainActivity` passes the Activity; `SettingsViewModel(private val context: Context)`.
 - **Impact:** **[I]** after rotation the retained ViewModel holds the destroyed Activity (memory leak, and stale-context bugs).
-- **Remediation:** pass `applicationContext` (or use `AndroidViewModel`).
-- **Status:** Open.
+- **Fix:** commit "fix: keep only the application context in SettingsViewModel" (stores `context.applicationContext`; `@SuppressLint("StaticFieldLeak")` with a comment because lint cannot distinguish it). With the B-002 change the factory is also given the application context.
+- **Verified:** `lintDebug` no longer reports `StaticFieldLeak`; the Activity count stays at 1 after rotation (see B-002).
+- **Status:** Fixed.
 
 ## <a id="b-010"></a>B-010 - Block screen behaviour
 
@@ -167,9 +169,10 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 
 - **Severity / confidence:** Medium / Confirmed.
 - **Evidence:** `app/src/test/.../ExampleUnitTest.kt` is the template `2 + 2`; `ExampleInstrumentedTest` is the template; both are in package `com.example.focusguard` while the app is `com.focusguard`.
-- **Impact:** None of the logic (session predicate, trigger calculation, usage state machine, JSON round-trip) is protected against regression.
-- **Remediation:** extract pure functions and add JUnit tests (see [DEBUGGING_AND_TESTING.md](DEBUGGING_AND_TESTING.md#testing-strategy)).
-- **Status:** Open.
+- **Impact:** Most logic (trigger calculation, usage state machine) is still unprotected against regression.
+- **Progress:** 24 JVM tests added (`SessionRulesTest` 16, `FocusSessionJsonTest` 5, `BlockingPreferenceTest` 3). Still untested: `SessionScheduler.calculateNextTrigger`, the usage state machine, ViewModels, persistence, any UI.
+- **Remediation:** continue per [DEBUGGING_AND_TESTING.md](DEBUGGING_AND_TESTING.md#testing-strategy).
+- **Status:** Open (partly addressed).
 
 ## <a id="b-014"></a>B-014 - Layering and duplication debt
 
@@ -216,7 +219,8 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 
 - **Severity / confidence:** Low / Strongly suspected.
 - **Details:** `saveSession` copies `_state.value.sessions` (a UI snapshot) and rewrites the whole JSON. If the stored JSON is corrupt, `sessionsFlow` emits an empty list and the next save overwrites the data; individual malformed sessions are silently dropped by `runCatching`.
-- **Remediation:** operate inside `dataStore.edit {}` (read-modify-write in one transaction); log parse failures; consider Room.
+- **Observed on the emulator:** a deliberately malformed DataStore file makes `BootReceiver.onReceive` throw `CorruptionException` (uncaught, because the `runBlocking` read is not wrapped), crashing the process. A `ReplaceFileCorruptionHandler` would avoid this.
+- **Remediation:** operate inside `dataStore.edit {}` (read-modify-write in one transaction); log parse failures; add a corruption handler; consider Room.
 - **Status:** Open.
 
 ## <a id="b-021"></a>B-021 - Weekly data never refreshes
@@ -236,8 +240,9 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 - **Severity / confidence:** Medium / Confirmed.
 - **Evidence:** `grep -rn "deleteSession" app/src/main` finds only the definition in `SessionsViewModel`; no composable calls it.
 - **Impact:** A mistaken or obsolete session (especially a repeating one) can be edited but never removed; with no break-friction either, users may be stuck with unwanted blocking.
-- **Remediation:** add delete (with confirmation) to the edit screen, and ideally an enable/disable switch.
-- **Status:** Open.
+- **Fix:** commit "fix: let users delete a saved session from its edit screen": `CreateSessionScreen(canDelete, onDelete)`; a red "Delete Schedule" button with a confirmation dialog, shown only if the session id is already in `SessionsState.sessions` (templates being added are not yet stored). `onDelete` calls the existing `deleteSession`, which also cancels the alarms.
+- **Verified on the emulator:** dialog appears; Cancel keeps the form; Delete returns to the list without the session; the stored list is empty; the `dumpsys alarm` history shows the start and end alarms with `Reason=alarm_cancelled`; the previously blocked app opens. Not done: an enable/disable switch (still missing) and a Compose UI test.
+- **Status:** Fixed (delete). An enable/disable switch remains a possible follow-up.
 
 ---
 
@@ -245,4 +250,11 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 
 | Date | ID | Commit | Result |
 |---|---|---|---|
-| - | - | - | No fixes applied yet |
+| 2026-10-25 | refactor | `refactor: share the session-active rule between service and sessions screen` | `remainingMillisAt` is the single rule; behaviour unchanged |
+| 2026-10-25 | tests | `test: characterize session-active rule and FocusSession JSON` | 21 tests pass |
+| 2026-10-25 | B-009 | `fix: keep only the application context in SettingsViewModel` | Fixed; `StaticFieldLeak` gone from lint |
+| 2026-10-25 | B-002 | `fix: create ViewModels through the ViewModelStore and use application context` | Fixed; emulator: 9 -> 1 Activities after 12 rotations |
+| 2026-10-25 | B-003 | `fix: make the Enable App Blocking setting pause blocking` | Fixed; emulator: switch off -> app not blocked |
+| 2026-10-25 | B-023 | `fix: let users delete a saved session from its edit screen` | Fixed (delete); emulator-verified |
+
+After these changes: `testDebugUnitTest` runs 25 tests (24 new plus the template test), all passing; `lintDebug` reports 86 errors (85 `NewApi` + 1 `MissingSuperCall`), down from 93, because the duplicated `java.time` code was merged.

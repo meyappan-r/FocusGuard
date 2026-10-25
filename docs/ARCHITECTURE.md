@@ -68,6 +68,7 @@ flowchart TB
     SVM --> SDS --> SYS3
     SVM --> SCH --> SYS2
     STVM --> SYS5
+    SVC -- "enabled flag" --> SYS5
     LM --> SYS4
 
     SYS2 -- "alarm" --> AR --> SDS
@@ -88,7 +89,7 @@ What the picture shows that the usual "clean architecture" diagram would hide:
 - **`core/` bypasses the layers.** The accessibility service talks straight to
   `SessionDataStore`, `LimitManager` and `UsageStatsManager`, and reads static sets from
   `UsageRepositoryImpl`'s companion object **[O]**.
-- **`domain/` is thin and leaky.** The only use case (`GetDailyUsageUseCase`) wraps one call and
+- **`domain/` is thin and leaky.** It holds `rules/SessionRules.kt` (the shared "is this session active?" rule, see section 6). The only use case (`GetDailyUsageUseCase`) wraps one call and
   depends on the concrete `UsageRepositoryImpl` (there is no repository interface), and
   `HomeViewModel` calls the repository directly for weekly data **[O]**.
 - **`FocusSession`, the core business model, lives in `data/local/SessionDataStore.kt`**, not in
@@ -122,8 +123,9 @@ All components share one process and one `Application` (no custom `Application` 
 
 Two storage technologies are used for the same kind of data (small key-value state). Only the
 DataStore ones are observable as a `Flow`; the service therefore has to *poll* limits but can
-*subscribe* to sessions. The `blocking_enabled` value is **never read by the enforcement code**
-([B-003](BUGS_AND_TECHNICAL_DEBT.md#b-003)).
+*subscribe* to sessions. The `blocking_enabled` switch is shared through `data/local/BlockingPreference`:
+`SettingsViewModel` writes it and `BlockerAccessibilityService` checks it before evaluating anything
+([B-003](BUGS_AND_TECHNICAL_DEBT.md#b-003), fixed).
 
 ## 5. Startup and object wiring
 
@@ -134,22 +136,22 @@ sequenceDiagram
     participant VM as ViewModels
     participant UI as setContent
     OS->>MA: launch (or relaunch after rotation)
-    MA->>MA: new UsageStatsDataSource / UsageRepositoryImpl / GetDailyUsageUseCase / LimitManager
-    MA->>VM: HomeViewModel(useCase, repo)  [plain constructor]
-    MA->>VM: BlocksViewModel(useCase, limitManager)  [plain constructor]
-    MA->>VM: SessionsViewModel(dataStore, scheduler)  [plain constructor, starts 3 coroutines]
-    MA->>VM: ViewModelProvider(factory)[SettingsViewModel]  [the only one in a ViewModelStore]
+    MA->>MA: build collaborators from applicationContext (data source, repository, use case, limit manager, DataStore wrapper, scheduler)
+    MA->>VM: ViewModelProvider(viewModelFactory) Home / Blocks / Sessions  [initializer runs only the first time]
+    MA->>VM: ViewModelProvider(SettingsViewModelFactory)[SettingsViewModel]
     MA->>MA: startRoute = intent "navigate_to" ?: "home"
     MA->>UI: FocusGuardApp(...)
     UI->>UI: LaunchedEffect(startRoute) navigates if not home
 ```
 
-Consequence **[I, strongly supported by source]**: three of the four ViewModels are *not* in the
-Activity's `ViewModelStore`. They are recreated whenever the Activity is recreated
-(rotation, dark-mode switch, locale change), their `viewModelScope` is never cancelled
-(`onCleared()` is only called by the store), and `SessionsViewModel`'s infinite loop keeps
-running ([B-002](BUGS_AND_TECHNICAL_DEBT.md#b-002)). Only `SettingsViewModel` is retained, and
-it holds the *Activity* as its `Context` ([B-009](BUGS_AND_TECHNICAL_DEBT.md#b-009)).
+All four ViewModels are obtained through the Activity's `ViewModelStore`, so they survive
+rotation and their `viewModelScope` is cancelled only when the Activity finishes for good.
+Because they now outlive the Activity, **every collaborator is built from `applicationContext`**
+(a ViewModel must never reach an Activity through the repository or scheduler).
+Before this was fixed, three ViewModels were built with plain constructors, never entered the
+store, and leaked one Activity per rotation ([B-002](BUGS_AND_TECHNICAL_DEBT.md#b-002), measured
+on an emulator: 9 live Activities after 12 rotations vs 1 after the fix; also
+[B-009](BUGS_AND_TECHNICAL_DEBT.md#b-009)).
 
 Navigation: a `NavHost` with routes `home`, `blocks`, `sessions`, `settings`, `privacy`.
 The Sessions tab has its own *internal* navigation (`SessionNav` sealed class held in a
@@ -199,16 +201,17 @@ Key properties **[O]**:
 - Block exemptions are a static list: own package, `NEVER_BLOCKABLE` (dialer/SMS/contacts) and
   `ALWAYS_HIDDEN` (launchers, keyboards, Settings, GMS...) **[O]**.
 
-### The "is a session active" predicate exists three times
+### The "is a session active" rule
 
-| Copy | File | Used for |
+| Place | File | Used for |
 |---|---|---|
-| `shouldBlockSynchronously` | `core/services/BlockerAccessibilityService.kt` | enforcement |
-| `checkSessionActiveStatus` | `ui/sessions/SessionsViewModel.kt` | "Active session" card + countdown |
-| `calculateNextTrigger` (different shape) | `core/scheduling/SessionScheduler.kt` | alarm times |
+| `FocusSession.remainingMillisAt(now)` | `domain/rules/SessionRules.kt` | **the one rule**: returns ms left, or `null` when inactive |
+| called by `shouldBlockSynchronously` | `core/services/BlockerAccessibilityService.kt` | enforcement |
+| called by `evaluateActiveSession` | `ui/sessions/SessionsViewModel.kt` | "Active session" card + countdown |
+| `calculateNextTrigger` (different shape, still separate) | `core/scheduling/SessionScheduler.kt` | alarm times |
 
-They agree today on the inputs the UI can produce, but nothing enforces that, and they share the
-same midnight-crossing limitation ([B-004](BUGS_AND_TECHNICAL_DEBT.md#b-004)).
+The rule is pinned by `SessionRulesTest` (including its midnight-crossing limitation,
+[B-004](BUGS_AND_TECHNICAL_DEBT.md#b-004)). The scheduler's separate date math is not yet covered.
 
 ## 7. The alarm subsystem and what it really does
 
@@ -262,15 +265,14 @@ input-method packages, plus the app itself and `com.android.server*`.
 | `AccessibilityService` for foreground detection | Event-driven, no foreground service or polling needed to notice app switches | Needs a scary user-granted permission; killed by some OEMs; Play-policy scrutiny. Alternative: foreground service polling `UsageEvents` (battery, notification) |
 | Clock-driven enforcement + in-memory caches | Zero-latency, survives alarm failures, no state machine to corrupt | Rules duplicated in several places; every event does date math |
 | Sessions as one JSON string in DataStore | No schema/migration work, simple `Flow` | Whole-list rewrite on every save, no partial updates, silent data loss on parse errors; Room would give queries and migrations |
-| Manual DI in `MainActivity` | Tiny app, no framework overhead | Breaks ViewModel lifecycle (see section 5); hard to unit-test; Hilt or a `ViewModelProvider.Factory` per VM would fix |
+| Manual DI in `MainActivity` | Tiny app, no framework overhead | Must be done carefully (application context + `ViewModelProvider`, see section 5); the service and receivers have their own second wiring; Hilt would centralise it |
 | Custom event-stream usage algorithm | Matches Digital Wellbeing better than `totalTimeInForeground` (see commit `8457d3f`) | Two algorithms in the codebase; untested |
 | Compose + single-activity + bottom nav | Modern default, little boilerplate | Sessions' internal nav is not saved across recreation |
 | `BlockActivity` written with XML views | Quick overlay, no Compose startup cost in a hot path **[I]** | Third UI style in the app (XML + Compose + hard-coded colors) |
 
 ## 10. Known architectural weaknesses (summary)
 
-See the bug list for IDs and evidence: ViewModel lifecycle ([B-002](BUGS_AND_TECHNICAL_DEBT.md#b-002)),
-no automated tests ([B-013](BUGS_AND_TECHNICAL_DEBT.md#b-013)), duplicated session math
-([B-004](BUGS_AND_TECHNICAL_DEBT.md#b-004)), two usage algorithms
+See the bug list for IDs and evidence: thin test coverage ([B-013](BUGS_AND_TECHNICAL_DEBT.md#b-013)), the
+scheduler's separate date math and the midnight limitation ([B-004](BUGS_AND_TECHNICAL_DEBT.md#b-004)), two usage algorithms
 ([B-006](BUGS_AND_TECHNICAL_DEBT.md#b-006)), `java.time` on `minSdk 21` without desugaring
 ([B-001](BUGS_AND_TECHNICAL_DEBT.md#b-001)).

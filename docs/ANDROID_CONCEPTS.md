@@ -49,21 +49,22 @@ change, memory pressure). A `ViewModel` outlives *configuration* recreation beca
 `ViewModelStore` owned by the Activity; `viewModelScope` is cancelled in `onCleared()`, which is
 called only when the store is cleared for good.
 
-**In this project.** `HomeViewModel`, `BlocksViewModel` and `SessionsViewModel` are created with plain
-constructors in `MainActivity.onCreate`, so they never enter the store; only `SettingsViewModel`
-goes through `ViewModelProvider` + `SettingsViewModelFactory` **[O]**. Implications **[I]**: state
-reset on rotation, `onCleared` never runs, and `SessionsViewModel.init` launches loops that run
-forever ([B-002](BUGS_AND_TECHNICAL_DEBT.md#b-002)). Conversely `SettingsViewModel` survives
-rotation but holds the first Activity as `Context` ([B-009](BUGS_AND_TECHNICAL_DEBT.md#b-009)).
+**In this project.** All four ViewModels are obtained with `ViewModelProvider` in `MainActivity.onCreate`
+(three with `viewModelFactory { initializer { ... } }`, `SettingsViewModel` with `SettingsViewModelFactory`) **[O]**.
+The rule to remember: *a ViewModel outlives the Activity, so everything it references must come from
+`applicationContext`.* This was violated until fixed: the three plain-constructor ViewModels never entered the
+store, `onCleared` never ran, `SessionsViewModel.init`'s loops kept running, and each rotation leaked an Activity
+(**reproduced**: 9 live Activities after 12 rotations, 1 after the fix - [B-002](BUGS_AND_TECHNICAL_DEBT.md#b-002));
+`SettingsViewModel` held the first Activity ([B-009](BUGS_AND_TECHNICAL_DEBT.md#b-009)).
 
 **Failure modes.** Leaking an Activity via a long-lived reference; doing work in `init` that nobody cancels;
 assuming state survives process death (ViewModel does not - that needs `SavedStateHandle` / persistence).
 
-**Debug.** Rotate the device and watch which screens reset; Android Studio Profiler -> memory ->
-count `MainActivity` instances after several rotations (expect > 1 if leaking).
+**Debug.** Rotate the device and count live Activities: `adb shell dumpsys meminfo <pkg>` -> `Activities:` (after a
+forced GC); or the Android Studio Profiler heap dump. Expect 1.
 
-**Practice.** Replace the plain constructors with `viewModels { factory }` and show with the
-profiler that Activity instances stop accumulating.
+**Practice.** Re-introduce a leak on purpose (store `this` in a ViewModel field), rotate five times, and watch the
+count climb; then fix it. Also try `SavedStateHandle` to keep a form draft across process death.
 
 ---
 
@@ -189,9 +190,9 @@ cancelling the scope cancels children (*structured concurrency*). A `Dispatcher`
 
 | Place | Scope / dispatcher | Lifetime |
 |---|---|---|
-| ViewModels `loadUsage`, `saveSession`, ... | `viewModelScope` (Main.immediate) | until `onCleared()` - which is never called for three of the four VMs |
+| ViewModels `loadUsage`, `saveSession`, ... | `viewModelScope` (Main.immediate) | until `onCleared()` |
 | `GetDailyUsageUseCase.execute` | `withContext(Dispatchers.IO)` | one call |
-| `SessionsViewModel` 1 Hz loop | `viewModelScope.launch(Dispatchers.Default) { while (true) { ...; delay(1000) } }` | forever (see above) |
+| `SessionsViewModel` 1 Hz loop | `viewModelScope.launch(Dispatchers.Default) { while (true) { ...; delay(1000) } }` | until the ViewModel is cleared (`delay` is cancellable); leaked forever before B-002 was fixed |
 | Service collectors + poll | `CoroutineScope(SupervisorJob() + Dispatchers.IO + handler)` | never cancelled |
 | `BlockActivity` unblock | `CoroutineScope(Dispatchers.IO).launch` (anonymous, unowned) | fire-and-forget |
 | Receivers | `runBlocking` | blocks the main thread |
@@ -273,7 +274,8 @@ build still succeeds because `abortOnError = false`. `AlarmManager.setExactAndAl
 ## Manual dependency injection
 
 "DI" means: a class receives its collaborators instead of creating them. Frameworks (Hilt, Koin) automate wiring;
-doing it by hand in `MainActivity.onCreate` is fine for a small app but, as shown above, can bypass lifecycle
-management. A middle path: write a `ViewModelProvider.Factory` per ViewModel (as `SettingsViewModelFactory` does) and
-obtain them with `by viewModels { ... }`. The service and receivers cannot use `MainActivity`'s wiring, so they
+doing it by hand in `MainActivity.onCreate` is fine for a small app but, as the leak above showed, easy to get wrong
+(plain constructors bypass the lifecycle). The current pattern: build collaborators from `applicationContext`, then
+obtain each ViewModel through `ViewModelProvider(this, viewModelFactory { initializer { ... } })`, as
+`SettingsViewModelFactory` already did. The service and receivers cannot use `MainActivity`'s wiring, so they
 construct `SessionDataStore`/`LimitManager` themselves - a second hidden "composition root".

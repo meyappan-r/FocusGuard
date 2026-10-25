@@ -78,10 +78,32 @@ Common symptoms:
 
 ---
 
+## Emulator workflow (no UI clicking needed)
+
+Used to reproduce and verify B-002, B-003 and B-023 on a `Pixel_8a` AVD (API 36). Debug builds only (`run-as`).
+
+| Goal | How |
+|---|---|
+| Boot headless | `emulator -avd Pixel_8a -no-window -no-audio -no-snapshot-save -gpu swiftshader_indirect` |
+| Grant usage access | `adb shell appops set com.focusguard GET_USAGE_STATS allow` |
+| Enable the service | `adb shell settings put secure enabled_accessibility_services com.focusguard/com.focusguard.core.services.BlockerAccessibilityService` then `settings put secure accessibility_enabled 1` |
+| Seed a daily limit / switch | write `shared_prefs/limit_preferences.xml` (`<long name="<pkg>" value="1"/>`) and `shared_prefs/settings_prefs.xml` with `run-as com.focusguard sh -c '...'` while the app is force-stopped |
+| Seed sessions | write `files/datastore/focus_sessions_datastore.preferences_pb`: a protobuf `PreferenceMap` with key `sessions_json_v2` and a string value (Value field 5) holding the JSON array |
+| See what is on top | `adb shell dumpsys window | grep mCurrentFocus` (is it `BlockActivity` or the target app?) |
+| Count leaked Activities | rotate with `settings put system user_rotation 0/1`, GC with `run-as com.focusguard kill -10 <pid>`, read `dumpsys meminfo com.focusguard` -> `Activities:` |
+| Drive Compose UI | `adb shell uiautomator dump` then `adb shell input tap x y` (Compose nodes expose their text) |
+
+Caveat: a malformed DataStore file crashes `BootReceiver` (see [B-020](BUGS_AND_TECHNICAL_DEBT.md#b-020)); delete the file to recover.
+
+---
+
 ## Testing strategy
 
-**Current state:** only the two template tests exist ([B-013](BUGS_AND_TECHNICAL_DEBT.md#b-013)); nothing in the
-business logic is verified by automation.
+**Current state:** 24 JVM unit tests (`app/src/test/java/com/focusguard/`): `SessionRulesTest` (16, the
+session-active rule incl. quirks), `FocusSessionJsonTest` (5), `BlockingPreferenceTest` (3), plus the template test
+([B-013](BUGS_AND_TECHNICAL_DEBT.md#b-013)). Not yet covered: `SessionScheduler.calculateNextTrigger`, the usage state
+machine, ViewModels, persistence, UI. JVM tests need `testImplementation("org.json:json")` because `android.jar`
+only has stub `org.json` classes.
 
 **Recommended order (highest value, lowest cost first):**
 
@@ -108,8 +130,8 @@ justified change.
 | 1 | Create one-time session starting in 2 min, block app A | App A blocked after start, not before |
 | 2 | During the session tap "Unblock manually" | 5-minute break; app A usable; "End Break Early" visible on Sessions tab |
 | 3 | Set a 1-minute limit on app B, use it for 1 min | App B blocked within ~10 s |
-| 4 | Toggle "Enable App Blocking" off | (Currently has no effect - [B-003](BUGS_AND_TECHNICAL_DEBT.md#b-003)) |
-| 5 | Rotate device on Sessions tab | (Currently resets - [B-002](BUGS_AND_TECHNICAL_DEBT.md#b-002)/[B-018](BUGS_AND_TECHNICAL_DEBT.md#b-018)) |
+| 4 | Toggle "Enable App Blocking" off, open a blocked app | App opens normally; switch on -> blocked again ([B-003](BUGS_AND_TECHNICAL_DEBT.md#b-003), fixed) |
+| 5 | Rotate device on Sessions tab | List state kept; an in-progress form draft is still lost ([B-018](BUGS_AND_TECHNICAL_DEBT.md#b-018)) |
 | 6 | Reboot with the service disabled | Notification appears (API 33+: only if notification permission granted - [B-015](BUGS_AND_TECHNICAL_DEBT.md#b-015)) |
 
 ---
@@ -124,4 +146,5 @@ Facts recorded while producing this documentation (Windows, Git Bash, JDK 21):
 | `./gradlew.bat lintDebug --console=plain` | BUILD SUCCESSFUL in 1 m 42 s; "Lint found 93 errors, 40 warnings (and 23 warnings filtered by baseline)". Errors: 92 `NewApi` (`java.time` API 26 / `AlarmManager` API 23) + 1 `MissingSuperCall` (`BlockActivity.onBackPressed`). Notable warnings: `StaticFieldLeak` (`SettingsViewModel`), `SetTextI18n`, `HardcodedText`, `GradleDependency`, `UnusedResources`. The baseline file lists 24 entries that no longer match |
 | Mermaid syntax check (`mermaid.parse`, v10.9.1 in the built-in browser) of the 5 diagrams in `ARCHITECTURE.md` | all 5 parse without error (syntax only; rendering on GitHub not checked) |
 | Doc link/anchor check (throwaway Python script, not committed) | all relative links and anchors in `README.md` and `docs/*.md` resolve, except the 4 pre-existing `screenshots/*.png` links in the root README (the images do not exist; "coming soon") |
-| Run on a device / emulator | **Not done** - no device was used; every runtime claim in these docs is therefore `[O]`/`[I]`, not `[V]` |
+| Stage E runs (2026-10-25) | `testDebugUnitTest`: 25 tests, 0 failures. `lintDebug`: 86 errors (85 `NewApi`, 1 `MissingSuperCall`), 40 warnings. Emulator: B-002 measured 9 -> 1 live Activities after 12 rotations; B-003 reproduced and fixed; B-023 delete flow verified (see each entry in the bug list) |
+| Physical device / API 21-25 / OEM behaviour | **Not done** - everything verified at runtime was on one API 36 emulator |

@@ -26,15 +26,16 @@ Every non-trivial statement about the app is one of:
 - **[I] Inferred** - a reasonable interpretation of the code or platform documentation, not run.
 - **[U] Unverified** - needs a device or more evidence.
 
-Statements without a tag are definitions of Android/Kotlin concepts, or are observed in the source. No
-runtime verification on a device has been done yet.
+Statements without a tag are definitions of Android/Kotlin concepts, or are observed in the source. Runtime checks
+were done only on one API 36 emulator (see the verification log); nothing was tested on a physical device.
 
 ## Baseline
 
-The docs describe commit `6ff1a61` ("commit tried to change blockactivity color palette") **plus** the
-author's uncommitted working-tree edits at the time of writing: the new `BlockActivity` "Unblock manually"
-flow (fixed 5-minute break + redirect to Blocks), a cast cleanup in `SessionDataStore.clearBreak`, and the
-launcher-icon change. Where behaviour differs from the last commit the text says so.
+The docs describe the code as of the Stage E commits (the session-rule refactor, new tests and the fixes for
+B-002, B-003, B-009 and B-023; see the fix log in [BUGS_AND_TECHNICAL_DEBT.md](BUGS_AND_TECHNICAL_DEBT.md#fix-log)),
+built on commit `6ff1a61`, **plus** the author's uncommitted working-tree edits: the new `BlockActivity`
+"Unblock manually" flow (fixed 5-minute break + redirect to Blocks), a cast cleanup in `SessionDataStore.clearBreak`,
+and the launcher-icon change. Where behaviour differs from the last commit the text says so.
 
 ## Keeping docs in sync
 
