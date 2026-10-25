@@ -1,21 +1,31 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
+# Build output and Gradle
+.gradle/
+build/
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+.kotlin/
 
+# Local configuration and secrets - never commit
+local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# IDE and tool settings
+.idea/
+*.iml
+.vscode/
+.claude/
+.DS_Store
+
+# Personal notes, study material and scratch files (not part of the app)
+/docs/
 LEARN.md
 learn_part*.md
-
-# Personal study material (kept local)
-docs/LEARNING_AND_INTERVIEW_GUIDE.md
+SRS.md
+*.pdf
+/*.log
+/*.txt
+/-files
+ktlint.exe
