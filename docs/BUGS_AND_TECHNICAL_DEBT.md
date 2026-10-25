@@ -17,13 +17,13 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 
 | ID | Sev | Confidence | Title |
 |---|---|---|---|
-| [B-001](#b-001) | High | Confirmed (lint) | `java.time` used on `minSdk 21` without desugaring |
+| [B-001](#b-001) | High | Confirmed (lint) - *Fixed* | `java.time` used on `minSdk 21` without desugaring |
 | [B-002](#b-002) | High | **Reproduced** - *Fixed* | ViewModels bypass the ViewModelStore; infinite loops never cancelled |
 | [B-007](#b-007) | High | Confirmed | Signing passwords hardcoded in tracked `build.gradle.kts` |
 | [B-003](#b-003) | Medium | **Reproduced** - *Fixed* | "Enable App Blocking" setting is not enforced |
 | [B-005](#b-005) | Medium | Strongly suspected | A break does not suppress *limit* blocks |
 | [B-006](#b-006) | Medium | Needs verification | Home usage and limit enforcement use different algorithms |
-| [B-008](#b-008) | Medium | Strongly suspected | `runBlocking` in receivers; service scope never cancelled |
+| [B-008](#b-008) | Medium | Strongly suspected - *Fixed* | `runBlocking` in receivers; service scope never cancelled |
 | [B-009](#b-009) | Medium | Confirmed (lint) - *Fixed* | `SettingsViewModel` retains an Activity |
 | [B-010](#b-010) | Medium | Confirmed | Block screen: blank-screen path, ignores `breakMinutes`, `onBackPressed` lint error |
 | [B-011](#b-011) | Medium | Strongly suspected | App picker hides pre-installed (FLAG_SYSTEM) apps |
@@ -52,10 +52,9 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
   because `lint { abortOnError = false }`.
 - **Impact:** **[I]** On API 21-25 the first use of `LocalDateTime` throws `NoClassDefFoundError`; the service catches
   `Exception` but not `Error`, so blocking would crash or fail. Also `setExactAndAllowWhileIdle` needs API 23.
-- **Remediation options:** (a) enable desugaring + `coreLibraryDesugaring("com.android.tools:desugar_jdk_libs")`;
-  (b) raise `minSdk` to 26 (simplest, drops ~1% of devices; README must change).
-- **Risks:** (a) adds a dependency; (b) changes supported devices. **Verify:** `lintDebug` has 0 `NewApi`; run on an API 24 emulator.
-- **Status:** Open.
+- **Fix:** commit "fix: enable core library desugaring and guard API 23 alarm calls". Chose desugaring (keeps the documented `minSdk 21`, no product change): `isCoreLibraryDesugaringEnabled = true` + `coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")`; `SessionScheduler` falls back to `setExact` / `set` below API 23.
+- **Verified:** `lintDebug` -> 0 `NewApi` (was 85); blocking still works on the API 36 emulator. **Not verified:** an API 21-25 device or emulator (only API 36 images are installed), so the runtime benefit is unproven.
+- **Status:** Fixed (build/lint level); runtime on old APIs unverified.
 
 ## <a id="b-002"></a>B-002 - ViewModels created without a `ViewModelStore`; loops never cancelled
 
@@ -124,8 +123,9 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 - **Severity / confidence:** Medium / Strongly suspected.
 - **Where:** `SessionAlarmReceiver.onReceive`, `BootReceiver.onReceive`; `BlockerAccessibilityService.serviceScope`.
 - **Impact:** Main-thread blocking on a DataStore read inside a receiver (usually fast, but a cold DataStore on a busy device can approach the receiver time limit). `serviceScope` has no `onDestroy`/`onUnbind` cancel: if the system recreates the service, an old poll loop can keep running.
-- **Remediation:** use `goAsync()` + a short-lived scope in receivers; cancel `serviceScope` in `onDestroy`.
-- **Status:** Open.
+- **Fix:** commit "fix: stop blocking the main thread in receivers and cancel the service scope": both receivers use `goAsync()` + an IO coroutine, `pending.finish()` in `finally`, errors logged instead of crashing (this also stops the malformed-DataStore crash noted in B-020 from killing the process via the receivers); `BlockerAccessibilityService.onDestroy()` calls `serviceScope.cancel()`.
+- **Verified:** emulator: a direct `SessionAlarmReceiver` broadcast re-armed both alarms with no crash; blocking still works. The `BOOT_COMPLETED` path could not be triggered (the shell may not send that broadcast) and service teardown was not observed explicitly.
+- **Status:** Fixed.
 
 ## <a id="b-009"></a>B-009 - `SettingsViewModel` retains an Activity
 
@@ -256,5 +256,7 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 | 2026-10-25 | B-002 | `fix: create ViewModels through the ViewModelStore and use application context` | Fixed; emulator: 9 -> 1 Activities after 12 rotations |
 | 2026-10-25 | B-003 | `fix: make the Enable App Blocking setting pause blocking` | Fixed; emulator: switch off -> app not blocked |
 | 2026-10-25 | B-023 | `fix: let users delete a saved session from its edit screen` | Fixed (delete); emulator-verified |
+| 2026-10-25 | B-001 | `fix: enable core library desugaring and guard API 23 alarm calls` | Fixed; lint `NewApi` 85 -> 0 |
+| 2026-10-25 | B-008 | `fix: stop blocking the main thread in receivers and cancel the service scope` | Fixed; receiver re-arm verified on emulator |
 
-After these changes: `testDebugUnitTest` runs 25 tests (24 new plus the template test), all passing; `lintDebug` reports 86 errors (85 `NewApi` + 1 `MissingSuperCall`), down from 93, because the duplicated `java.time` code was merged.
+After these changes: `testDebugUnitTest` runs 25 tests (24 new plus the template test), all passing; `lintDebug` reports **1 error** (`MissingSuperCall` in `BlockActivity.onBackPressed`, in code with uncommitted edits by the author), down from 93.

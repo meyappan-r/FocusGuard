@@ -266,8 +266,9 @@ so Android Back inside the form is handled by a manual `BackHandler`.
 
 `java.time` (`LocalDate`, `LocalDateTime`, ...) is built into Android only from API 26. With `minSdk 21`, either
 enable **core library desugaring** (`isCoreLibraryDesugaringEnabled = true` + `desugar_jdk_libs`) or avoid it.
-This project does neither: lint reports 92 `NewApi` errors ([B-001](BUGS_AND_TECHNICAL_DEBT.md#b-001)) and the
-build still succeeds because `abortOnError = false`. `AlarmManager.setExactAndAllowWhileIdle` is API 23.
+This project now enables desugaring (`desugar_jdk_libs`); before that, lint reported 92 `NewApi` errors that never failed
+the build because `abortOnError = false` ([B-001](BUGS_AND_TECHNICAL_DEBT.md#b-001)). Platform APIs need guards instead:
+`AlarmManager.setExactAndAllowWhileIdle` is API 23, so `SessionScheduler` checks `Build.VERSION.SDK_INT`.
 
 ---
 
