@@ -8,33 +8,45 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.focusguard.R
 import com.focusguard.core.scheduling.SessionScheduler
 import com.focusguard.core.services.BlockerAccessibilityService
 import com.focusguard.data.local.SessionDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON") {
-            val sessionDataStore = SessionDataStore(context)
-            val scheduler = SessionScheduler(context)
-            
-            val sessions = runBlocking {
-                sessionDataStore.sessionsFlow.firstOrNull() ?: emptyList()
-            }
+            // Read the DataStore off the main thread; goAsync keeps the receiver alive until we finish.
+            val pending = goAsync()
+            val appContext = context.applicationContext
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val sessions = SessionDataStore(appContext).sessionsFlow.firstOrNull() ?: emptyList()
 
-            // 1. Reschedule all saved sessions entirely statelessly
-            sessions.forEach { session ->
-                scheduler.scheduleSession(session)
-            }
+                    // 1. Reschedule all saved sessions entirely statelessly
+                    val scheduler = SessionScheduler(appContext)
+                    sessions.forEach { session -> scheduler.scheduleSession(session) }
+                } catch (e: Exception) {
+                    Log.e("BootReceiver", "Failed to restore session alarms", e)
+                }
 
-            // 3. Accessibility Service verification
-            if (!isAccessibilityServiceEnabled(context)) {
-                sendAccessibilityNotification(context)
+                try {
+                    // 2. Accessibility Service verification
+                    if (!isAccessibilityServiceEnabled(appContext)) {
+                        sendAccessibilityNotification(appContext)
+                    }
+                } catch (e: Exception) {
+                    Log.e("BootReceiver", "Failed to check accessibility service", e)
+                } finally {
+                    pending.finish()
+                }
             }
         }
     }
