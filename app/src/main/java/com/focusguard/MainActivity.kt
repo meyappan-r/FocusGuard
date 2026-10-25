@@ -3,6 +3,9 @@ package com.focusguard
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
@@ -62,21 +65,31 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val dataSource   = UsageStatsDataSource(this)
-        val repository   = UsageRepositoryImpl(this, dataSource)
+        // ViewModels outlive this Activity across rotation, so everything they reference
+        // must be built from the application context, never from `this`.
+        val appContext   = applicationContext
+        val dataSource   = UsageStatsDataSource(appContext)
+        val repository   = UsageRepositoryImpl(appContext, dataSource)
         val useCase      = GetDailyUsageUseCase(repository)
-        val limitManager = LimitManager(this)
+        val limitManager = LimitManager(appContext)
+        val sessionDataStore = SessionDataStore(appContext)
+        val sessionScheduler = com.focusguard.core.scheduling.SessionScheduler(appContext)
 
-        // HomeViewModel now takes the repository too (for weekly data)
-        val homeViewModel    = HomeViewModel(useCase, repository)
-        val blocksViewModel  = BlocksViewModel(useCase, limitManager)
+        // Obtained through the ViewModelStore so they survive configuration changes and
+        // their viewModelScope is cancelled when the Activity is finished for good.
+        // The initializer only runs the first time; on recreation the existing instance is reused.
+        val homeViewModel = ViewModelProvider(this, viewModelFactory {
+            initializer { HomeViewModel(useCase, repository) }
+        })[HomeViewModel::class.java]
+        val blocksViewModel = ViewModelProvider(this, viewModelFactory {
+            initializer { BlocksViewModel(useCase, limitManager) }
+        })[BlocksViewModel::class.java]
+        val sessionsViewModel = ViewModelProvider(this, viewModelFactory {
+            initializer { com.focusguard.ui.sessions.SessionsViewModel(sessionDataStore, sessionScheduler) }
+        })[com.focusguard.ui.sessions.SessionsViewModel::class.java]
 
-        val sessionDataStore = SessionDataStore(this)
-        val sessionScheduler = com.focusguard.core.scheduling.SessionScheduler(this)
-        val sessionsViewModel = com.focusguard.ui.sessions.SessionsViewModel(sessionDataStore, sessionScheduler)
-
-        val settingsViewModel = androidx.lifecycle.ViewModelProvider(
-            this, com.focusguard.ui.settings.SettingsViewModelFactory(this)
+        val settingsViewModel = ViewModelProvider(
+            this, com.focusguard.ui.settings.SettingsViewModelFactory(appContext)
         )[com.focusguard.ui.settings.SettingsViewModel::class.java]
 
         val startRoute = intent.getStringExtra("navigate_to") ?: Screen.Home.route
