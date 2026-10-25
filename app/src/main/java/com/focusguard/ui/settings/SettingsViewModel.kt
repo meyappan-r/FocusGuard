@@ -17,7 +17,9 @@ data class SettingsState(
     val hasUsageStatsPermission: Boolean = false,
     val hasAccessibilityPermission: Boolean = false,
     val isBlockingEnabled: Boolean = true,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** True once the user has agreed to the accessibility disclosure. */
+    val accessibilityDisclosureAccepted: Boolean = false
 )
 
 class SettingsViewModel(context: Context) : ViewModel() {
@@ -37,7 +39,8 @@ class SettingsViewModel(context: Context) : ViewModel() {
         val savedBlocking = BlockingPreference.isEnabled(prefs)
         _state.value = _state.value.copy(
             themeMode = savedTheme,
-            isBlockingEnabled = savedBlocking
+            isBlockingEnabled = savedBlocking,
+            accessibilityDisclosureAccepted = prefs.getBoolean(KEY_DISCLOSURE_ACCEPTED, false)
         )
         checkPermissions()
     }
@@ -96,6 +99,21 @@ class SettingsViewModel(context: Context) : ViewModel() {
         return false
     }
 
+    fun acceptAccessibilityDisclosure() {
+        prefs.edit().putBoolean(KEY_DISCLOSURE_ACCEPTED, true).apply()
+        _state.value = _state.value.copy(accessibilityDisclosureAccepted = true)
+    }
+
+    /** The disclosure is offered once on first use if the service is not enabled and consent is missing. */
+    fun shouldPromptDisclosure(): Boolean =
+        !_state.value.accessibilityDisclosureAccepted &&
+            !_state.value.hasAccessibilityPermission &&
+            !prefs.getBoolean(KEY_DISCLOSURE_PROMPTED, false)
+
+    fun markDisclosurePrompted() {
+        prefs.edit().putBoolean(KEY_DISCLOSURE_PROMPTED, true).apply()
+    }
+
     fun toggleBlocking(enabled: Boolean) {
         prefs.edit().putBoolean(BlockingPreference.KEY_BLOCKING_ENABLED, enabled).apply()
         _state.value = _state.value.copy(isBlockingEnabled = enabled)
@@ -118,6 +136,9 @@ class SettingsViewModel(context: Context) : ViewModel() {
         })
     }
 }
+
+private const val KEY_DISCLOSURE_ACCEPTED = "accessibility_disclosure_accepted"
+private const val KEY_DISCLOSURE_PROMPTED = "accessibility_disclosure_prompted"
 
 class SettingsViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

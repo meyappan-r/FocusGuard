@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">FocusGuard</string>
-    <string name="accessibility_service_description">Used by FocusGuard to monitor foreground apps and enforce blocking rules.</string>
+    <string name="accessibility_service_description">FocusGuard uses this service only to detect which app has just opened, so it can show a block screen for apps you chose to block. It does not read screen content, text you type, or notifications, and nothing leaves your device.</string>
 </resources>

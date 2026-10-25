@@ -58,6 +58,18 @@ fun SettingsScreen(
     var isCheckingUpdates by remember { mutableStateOf(false) }
     var updateSubtitle by remember { mutableStateOf("You are up to date.") }
     var showVersionDialog by remember { mutableStateOf(false) }
+    var showDisclosure by remember { mutableStateOf(false) }
+
+    if (showDisclosure) {
+        AccessibilityDisclosureDialog(
+            onAgree = {
+                viewModel.acceptAccessibilityDisclosure()
+                showDisclosure = false
+                viewModel.requestAccessibilityPermission(context)
+            },
+            onDecline = { showDisclosure = false }
+        )
+    }
 
     if (showVersionDialog) {
         Dialog(onDismissRequest = { showVersionDialog = false }) {
@@ -158,11 +170,14 @@ fun SettingsScreen(
                         icon      = if (state.hasAccessibilityPermission) Icons.Default.CheckCircle else Icons.Default.Lock,
                         iconTint  = if (state.hasAccessibilityPermission) fgAccent() else FG_Error,
                         title     = "Accessibility Service",
-                        subtitle  = "Required to enforce app limits.",
+                        subtitle  = "Required to block apps during sessions and limits.",
                         isGranted = state.hasAccessibilityPermission,
                         txtPri    = txtPri,
                         txtSec    = txtSec,
-                        onClick   = { viewModel.requestAccessibilityPermission(context) }
+                        onClick   = {
+                            if (state.accessibilityDisclosureAccepted) viewModel.requestAccessibilityPermission(context)
+                            else showDisclosure = true
+                        }
                     )
                 }
             }

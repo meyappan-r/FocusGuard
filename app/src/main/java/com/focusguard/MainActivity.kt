@@ -140,6 +140,9 @@ fun FocusGuardApp(
         com.focusguard.ui.settings.ThemeMode.SYSTEM -> systemDarkMode
     }
 
+    // Google Play requires a prominent disclosure before the user is sent to Accessibility settings
+    var showFirstRunDisclosure by remember { mutableStateOf(settingsViewModel.shouldPromptDisclosure()) }
+
     LaunchedEffect(startRoute) {
         if (startRoute != Screen.Home.route) {
             navController.navigate(startRoute) {
@@ -198,6 +201,22 @@ fun FocusGuardApp(
     androidx.compose.material3.MaterialTheme(
         colorScheme = colorScheme
     ) {
+        if (showFirstRunDisclosure) {
+            val appContext = androidx.compose.ui.platform.LocalContext.current
+            com.focusguard.ui.settings.AccessibilityDisclosureDialog(
+                onAgree = {
+                    settingsViewModel.acceptAccessibilityDisclosure()
+                    settingsViewModel.markDisclosurePrompted()
+                    showFirstRunDisclosure = false
+                    settingsViewModel.requestAccessibilityPermission(appContext)
+                },
+                onDecline = {
+                    settingsViewModel.markDisclosurePrompted()
+                    showFirstRunDisclosure = false
+                }
+            )
+        }
+
         Scaffold(
             // Each screen's own top bar handles the status-bar inset; the bottom bar handles the navigation bar
             contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
