@@ -7,6 +7,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.focusguard.data.local.BlockingPreference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -28,12 +29,12 @@ class SettingsViewModel(context: Context) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsState())
     val state: StateFlow<SettingsState> = _state
-    private val prefs = context.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(BlockingPreference.PREFS_NAME, Context.MODE_PRIVATE)
 
     init {
         val savedThemeName = prefs.getString("theme_mode", ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
         val savedTheme = runCatching { ThemeMode.valueOf(savedThemeName) }.getOrDefault(ThemeMode.SYSTEM)
-        val savedBlocking = prefs.getBoolean("blocking_enabled", true)
+        val savedBlocking = BlockingPreference.isEnabled(prefs)
         _state.value = _state.value.copy(
             themeMode = savedTheme,
             isBlockingEnabled = savedBlocking
@@ -96,7 +97,7 @@ class SettingsViewModel(context: Context) : ViewModel() {
     }
 
     fun toggleBlocking(enabled: Boolean) {
-        prefs.edit().putBoolean("blocking_enabled", enabled).apply()
+        prefs.edit().putBoolean(BlockingPreference.KEY_BLOCKING_ENABLED, enabled).apply()
         _state.value = _state.value.copy(isBlockingEnabled = enabled)
     }
 

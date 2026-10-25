@@ -1,9 +1,12 @@
 package com.focusguard.core.services
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import com.focusguard.data.local.BlockingPreference
 import com.focusguard.data.local.FocusSession
 import com.focusguard.data.local.LimitManager
 import com.focusguard.data.local.SessionDataStore
@@ -20,6 +23,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private lateinit var limitManager: LimitManager
     private lateinit var sessionDataStore: SessionDataStore
+    private lateinit var settingsPrefs: SharedPreferences
     
     // The core of the new system: in-memory cache directly mirrored from DataStore 
     // This allows absolutely zero-latency blocks on app switch.
@@ -43,6 +47,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         limitManager   = LimitManager(this)
         sessionDataStore = SessionDataStore(this)
+        settingsPrefs  = getSharedPreferences(BlockingPreference.PREFS_NAME, Context.MODE_PRIVATE)
 
 
         // Hook up the live pipe to the DataStore to continually preload our memory
@@ -74,6 +79,9 @@ class BlockerAccessibilityService : AccessibilityService() {
             val packageName = event.packageName?.toString() ?: return
             
             if (!::limitManager.isInitialized || !::sessionDataStore.isInitialized) return
+
+            // Settings > "Enable App Blocking" pauses all blocking (sessions and limits)
+            if (!BlockingPreference.isEnabled(settingsPrefs)) return
 
             // 1. Perform Sessions check strictly synchronously (zero yield)
             val blockingSessionName = shouldBlockSynchronously(packageName)
