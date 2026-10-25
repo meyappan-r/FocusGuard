@@ -90,7 +90,12 @@ fun SessionsScreen(viewModel: SessionsViewModel, isDarkMode: Boolean = false) {
             onPickApps = { draft ->
                 nav = SessionNav.AppPicker(draft, current.isNew)
             },
-            onDiscard  = { nav = SessionNav.Main }
+            onDiscard  = { nav = SessionNav.Main },
+            canDelete  = state.sessions.any { it.id == current.session.id },
+            onDelete   = {
+                viewModel.deleteSession(current.session.id)
+                nav = SessionNav.Main
+            }
         )
         is SessionNav.AppPicker -> AppPickerScreen(
             allApps         = state.installedApps,
@@ -489,7 +494,10 @@ fun CreateSessionScreen(
     isNew:      Boolean,
     onSave:     (FocusSession) -> Unit,
     onPickApps: (FocusSession) -> Unit,
-    onDiscard:  () -> Unit
+    onDiscard:  () -> Unit,
+    /** True only when this session already exists in storage (a template being added is not yet saved). */
+    canDelete:  Boolean = false,
+    onDelete:   () -> Unit = {}
 ) {
     // Mutable form state (derived from initial)
     var name         by remember { mutableStateOf(initial.name) }
@@ -512,6 +520,7 @@ fun CreateSessionScreen(
 
     // Dialogs
     var showDiscard    by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var showTagPicker  by remember { mutableStateOf(false) }
     var showFromPicker by remember { mutableStateOf(false) }
     var showToPicker   by remember { mutableStateOf(false) }
@@ -566,6 +575,25 @@ fun CreateSessionScreen(
             dismissButton = {
                 TextButton(onClick = { showDiscard = false }) {
                     Text("Keep editing", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // ── Delete confirmation dialog ────────────────────────────
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete this schedule?", fontWeight = FontWeight.Bold) },
+            text  = { Text("Its blocking rules and alarms will be removed. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete() }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         )
@@ -871,6 +899,20 @@ fun CreateSessionScreen(
                     ),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
                 )
+            }
+
+            if (canDelete) {
+                Spacer(modifier = Modifier.height(20.dp))
+                OutlinedButton(
+                    onClick  = { showDeleteConfirm = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(12.dp),
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete Schedule", fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
