@@ -1,8 +1,10 @@
 package com.focusguard.domain.rules
 
 import com.focusguard.data.local.FocusSession
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 private const val MILLIS_PER_DAY = 24 * 60 * 60_000L
 
@@ -44,5 +46,29 @@ fun FocusSession.remainingMillisAt(now: LocalDateTime): Long? {
         (MILLIS_PER_DAY - currentMs) + toMs
     } else {
         toMs - currentMs
+    }
+}
+
+/** Default date and time window offered for a brand-new one-time session. */
+data class NewSessionWindow(
+    val date: LocalDate,
+    val fromHour: Int,
+    val fromMinute: Int,
+    val toHour: Int,
+    val toMinute: Int
+)
+
+/**
+ * Starts at the next full hour (so it always passes the "start must be in the future" check) and
+ * lasts two hours, clamped to 23:59 so it never crosses midnight. After 23:00 the next full hour
+ * is tomorrow's 00:00, so the date moves to tomorrow.
+ */
+fun defaultNewSessionWindow(now: LocalDateTime): NewSessionWindow {
+    val start = now.truncatedTo(ChronoUnit.HOURS).plusHours(1)
+    val endHour = start.hour + 2
+    return if (endHour >= 24) {
+        NewSessionWindow(start.toLocalDate(), start.hour, 0, 23, 59)
+    } else {
+        NewSessionWindow(start.toLocalDate(), start.hour, 0, endHour, 0)
     }
 }

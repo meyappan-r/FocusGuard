@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.focusguard.core.scheduling.SessionScheduler
 import com.focusguard.data.local.FocusSession
 import com.focusguard.data.local.SessionDataStore
+import com.focusguard.domain.rules.defaultNewSessionWindow
 import com.focusguard.domain.rules.remainingMillisAt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -187,19 +188,19 @@ class SessionsViewModel(
     )
 
     fun blankSession(): FocusSession {
-        val now = java.util.Calendar.getInstance()
+        val window = defaultNewSessionWindow(LocalDateTime.now())
         return FocusSession(
             id              = UUID.randomUUID().toString(),
             name            = "",
             emoji           = "⏱️",
             tag             = "Untagged",
-            fromHour        = now.get(java.util.Calendar.HOUR_OF_DAY),
-            fromMinute      = 0,
-            toHour          = (now.get(java.util.Calendar.HOUR_OF_DAY) + 2) % 24,
-            toMinute        = 0,
+            fromHour        = window.fromHour,
+            fromMinute      = window.fromMinute,
+            toHour          = window.toHour,
+            toMinute        = window.toMinute,
             repeatEnabled   = false,
             repeatDays      = emptySet(),
-            oneTimeDate     = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
+            oneTimeDate     = window.date.format(DateTimeFormatter.ISO_LOCAL_DATE),
             breakMinutes    = 5,
             blockedPackages = emptySet(),
             description     = ""
