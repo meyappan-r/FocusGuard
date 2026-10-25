@@ -7,6 +7,7 @@ import android.view.accessibility.AccessibilityEvent
 import com.focusguard.data.local.FocusSession
 import com.focusguard.data.local.LimitManager
 import com.focusguard.data.local.SessionDataStore
+import com.focusguard.domain.rules.remainingMillisAt
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +15,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 class BlockerAccessibilityService : AccessibilityService() {
 
@@ -101,33 +101,13 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (packageName in com.focusguard.data.repository.UsageRepositoryImpl.ALWAYS_HIDDEN) return null
 
         val now = LocalDateTime.now()
-        val currentMs = (now.hour * 60 + now.minute) * 60000L + now.second * 1000L
-        val dayOfWeek = now.dayOfWeek.value - 1
-        val dateString = now.format(DateTimeFormatter.ISO_LOCAL_DATE)
 
         if (System.currentTimeMillis() < activeBreakExpiryCache) {
             return null // Currently in a temporary break
         }
 
         for (session in activeSessionsCache) {
-            val isToday = if (session.repeatEnabled) {
-                session.repeatDays.contains(dayOfWeek)
-            } else {
-                session.oneTimeDate == dateString
-            }
-            if (!isToday) continue
-
-            val fromMs = (session.fromHour * 60 + session.fromMinute) * 60000L
-            val toMs = (session.toHour * 60 + session.toMinute) * 60000L
-
-            val isActive = if (toMs > fromMs) {
-                currentMs in fromMs until toMs
-            } else {
-                // Crosses midnight
-                currentMs >= fromMs || currentMs < toMs
-            }
-
-            if (isActive && packageName in session.blockedPackages) {
+            if (session.remainingMillisAt(now) != null && packageName in session.blockedPackages) {
                 return session.name
             }
         }

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.focusguard.core.scheduling.SessionScheduler
 import com.focusguard.data.local.FocusSession
 import com.focusguard.data.local.SessionDataStore
+import com.focusguard.domain.rules.remainingMillisAt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -122,13 +123,11 @@ class SessionsViewModel(
         val activeList = mutableListOf<FocusSession>()
 
         for (session in currentSessions) {
-            val (isActive, remainingMs) = checkSessionActiveStatus(session, now)
-            if (isActive) {
-                activeList.add(session)
-                if (primaryActive == null || remainingMs < primaryRemaining) {
-                    primaryActive = session
-                    primaryRemaining = remainingMs
-                }
+            val remainingMs = session.remainingMillisAt(now) ?: continue
+            activeList.add(session)
+            if (primaryActive == null || remainingMs < primaryRemaining) {
+                primaryActive = session
+                primaryRemaining = remainingMs
             }
         }
 
@@ -139,44 +138,6 @@ class SessionsViewModel(
                 allActiveSessions = activeList
             )
         }
-    }
-
-    private fun checkSessionActiveStatus(session: FocusSession, now: LocalDateTime): Pair<Boolean, Long> {
-        val dayOfWeek = now.dayOfWeek.value - 1
-        val isToday = if (session.repeatEnabled) {
-            session.repeatDays.contains(dayOfWeek)
-        } else {
-            session.oneTimeDate == now.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        }
-        
-        if (!isToday) return false to 0L
-
-        val fromMs = (session.fromHour * 60 + session.fromMinute) * 60000L
-        val toMs = (session.toHour * 60 + session.toMinute) * 60000L
-        val currentMs = (now.hour * 60 + now.minute) * 60000L + now.second * 1000L
-
-        val isActive = if (toMs > fromMs) {
-            currentMs in fromMs until toMs
-        } else {
-            // Crosses midnight
-            currentMs >= fromMs || currentMs < toMs
-        }
-
-        if (!isActive) return false to 0L
-
-        // Calculate remaining correctly whether crossing midnight or not
-        val remaining = if (toMs > fromMs) {
-            toMs - currentMs
-        } else {
-            if (currentMs >= fromMs) {
-                // before midnight
-                (24 * 60 * 60000L - currentMs) + toMs
-            } else {
-                // after midnight
-                toMs - currentMs
-            }
-        }
-        return true to remaining
     }
 
     // ── Sessions CRUD ─────────────────────────────────────────
