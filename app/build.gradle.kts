@@ -79,4 +79,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
 
     testImplementation(libs.junit)
+    // android.jar only ships stub org.json classes; JVM unit tests need the real implementation
+    testImplementation("org.json:json:20240303")
 }
