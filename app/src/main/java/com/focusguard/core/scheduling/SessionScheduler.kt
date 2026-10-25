@@ -55,18 +55,33 @@ class SessionScheduler(private val context: Context) {
         )
 
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
-                } else {
-                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
-                }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+                !alarmManager.canScheduleExactAlarms()
+            ) {
+                setInexactAlarm(triggerTimeMillis, pendingIntent)
             } else {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
+                setExactCompat(triggerTimeMillis, pendingIntent)
             }
         } catch (e: SecurityException) {
             // Fallback if permission revoked
+            setInexactAlarm(triggerTimeMillis, pendingIntent)
+        }
+    }
+
+    // The AllowWhileIdle variants only exist from API 23 (minSdk is 21).
+    private fun setExactCompat(triggerTimeMillis: Long, pendingIntent: PendingIntent) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
+        } else {
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
+        }
+    }
+
+    private fun setInexactAlarm(triggerTimeMillis: Long, pendingIntent: PendingIntent) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
+        } else {
+            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pendingIntent)
         }
     }
 
