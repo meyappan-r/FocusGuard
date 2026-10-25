@@ -39,6 +39,7 @@ import com.focusguard.ui.extensions.rememberIs24Hour
 import com.focusguard.ui.extensions.timeRangeLabel
 import com.focusguard.ui.theme.FGColors
 import com.focusguard.ui.theme.fgAccent
+import com.focusguard.ui.theme.FocusRingMark
 import com.focusguard.ui.theme.fgSwitchColors
 import com.focusguard.ui.theme.FG_Error
 import com.focusguard.ui.theme.FG_Seg0
@@ -145,8 +146,7 @@ fun SessionsMainScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Shield, contentDescription = null,
-                            tint = fgAccent(), modifier = Modifier.size(20.dp))
+                        FocusRingMark(size = 22.dp)
                         Spacer(Modifier.width(8.dp))
                         Text("FocusGuard", fontWeight = FontWeight.Bold,
                             fontSize = 18.sp, color = txtPri)

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusguard.ui.theme.FGColors
 import com.focusguard.ui.theme.fgAccent
+import com.focusguard.ui.theme.FocusRingMark
 import com.focusguard.ui.theme.fgSwitchColors
 import com.focusguard.ui.theme.FG_Error
 import com.focusguard.ui.theme.FG_Seg0
@@ -69,12 +70,7 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        Icons.Default.Shield, 
-                        contentDescription = null, 
-                        tint = txtPri, 
-                        modifier = Modifier.size(52.dp)
-                    )
+                    FocusRingMark(size = 56.dp)
                     Spacer(Modifier.height(16.dp))
                     Text("FocusGuard", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = txtPri)
                     Text("Version $appVersion", fontSize = 13.sp, color = txtSec, fontWeight = FontWeight.Medium)
@@ -123,8 +119,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Shield, contentDescription = null,
-                            tint = fgAccent(), modifier = Modifier.size(20.dp))
+                        FocusRingMark(size = 22.dp)
                         Spacer(Modifier.width(8.dp))
                         Text("FocusGuard", fontWeight = FontWeight.Bold,
                             fontSize = 18.sp, color = txtPri)

@@ -6,6 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import com.focusguard.ui.theme.FocusRingMark
 import com.focusguard.ui.theme.fgAccent
 import com.focusguard.ui.extensions.clickableScale
 import androidx.compose.foundation.layout.*
@@ -16,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -189,12 +189,7 @@ fun FocusGuardHeader(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector         = Icons.Default.Shield,
-            contentDescription  = "FocusGuard",
-            tint                = Seg1,
-            modifier            = Modifier.size(20.dp)
-        )
+        FocusRingMark(size = 22.dp)
         Spacer(Modifier.width(8.dp))
         Text(
             text       = "FocusGuard",
