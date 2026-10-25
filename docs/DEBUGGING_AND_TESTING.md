@@ -99,8 +99,8 @@ Caveat: a malformed DataStore file crashes `BootReceiver` (see [B-020](BUGS_AND_
 
 ## Testing strategy
 
-**Current state:** 24 JVM unit tests (`app/src/test/java/com/focusguard/`): `SessionRulesTest` (16, the
-session-active rule incl. quirks), `FocusSessionJsonTest` (5), `BlockingPreferenceTest` (3), plus the template test
+**Current state:** 34 JVM unit tests (`app/src/test/java/com/focusguard/`): `SessionRulesTest` (16, the
+session-active rule incl. quirks), `FocusSessionJsonTest` (5), `BlockingPreferenceTest` (3), `NewSessionWindowTest` (6), `FormattingTest` (4), plus the template test
 ([B-013](BUGS_AND_TECHNICAL_DEBT.md#b-013)). Not yet covered: `SessionScheduler.calculateNextTrigger`, the usage state
 machine, ViewModels, persistence, UI. JVM tests need `testImplementation("org.json:json")` because `android.jar`
 only has stub `org.json` classes.

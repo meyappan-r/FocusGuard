@@ -39,6 +39,10 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 | [B-020](#b-020) | Low | Strongly suspected | Whole-list DataStore rewrite; silent loss on parse errors |
 | [B-021](#b-021) | Low | Confirmed | Weekly chart never refreshes |
 | [B-022](#b-022) | Low | Confirmed | Hidden-package cache never invalidated, unsynchronised |
+| [B-024](#b-024) | Medium | **Reproduced** - *Fixed* | System Back inside the app picker left the Sessions tab and lost the draft |
+| [B-025](#b-025) | Medium | **Reproduced** - *Fixed* | A new one-time session defaulted to a start time already in the past |
+| [B-026](#b-026) | Low | **Reproduced** - *Fixed* | "Repeat" with no day selected could be saved (a session that never runs) |
+| [B-027](#b-027) | Medium | **Reproduced** - *Fixed* | Dark theme: unreadable headings, tab label and accents; mixed time formats; off-palette widgets |
 | [B-019](#b-019) | Info | Confirmed | Release/policy posture |
 
 ---
@@ -170,7 +174,7 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 - **Severity / confidence:** Medium / Confirmed.
 - **Evidence:** `app/src/test/.../ExampleUnitTest.kt` is the template `2 + 2`; `ExampleInstrumentedTest` is the template; both are in package `com.example.focusguard` while the app is `com.focusguard`.
 - **Impact:** Most logic (trigger calculation, usage state machine) is still unprotected against regression.
-- **Progress:** 24 JVM tests added (`SessionRulesTest` 16, `FocusSessionJsonTest` 5, `BlockingPreferenceTest` 3). Still untested: `SessionScheduler.calculateNextTrigger`, the usage state machine, ViewModels, persistence, any UI.
+- **Progress:** 34 JVM tests added (`SessionRulesTest` 16, `FocusSessionJsonTest` 5, `BlockingPreferenceTest` 3, `NewSessionWindowTest` 6, `FormattingTest` 4). Still untested: `SessionScheduler.calculateNextTrigger`, the usage state machine, ViewModels, persistence, any UI.
 - **Remediation:** continue per [DEBUGGING_AND_TESTING.md](DEBUGGING_AND_TESTING.md#testing-strategy).
 - **Status:** Open (partly addressed).
 
@@ -246,6 +250,44 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 
 ---
 
+## <a id="b-024"></a>B-024 - Back button in the app picker
+
+- **Found by:** driving the Sessions flow on the emulator. In `AppPickerScreen`, pressing system Back jumped to the Home tab, discarding the half-filled form (only `CreateSessionScreen` had a `BackHandler`).
+- **Fix:** `BackHandler(onBack = onBack)` in `AppPickerScreen`, plus a visible back arrow in its top bar. **Verified:** Back returns to the form with the name intact; picking an app then shows "1 app".
+- **Status:** Fixed.
+
+## <a id="b-025"></a>B-025 - New session started in the past
+
+- **Found by:** opening "New Session" on the emulator: `blankSession()` used the current hour at minute 0, which is always earlier than now, so the form opened with "Start time must be in the future" and Save disabled.
+- **Fix:** `defaultNewSessionWindow(now)` (`domain/rules/SessionRules.kt`): starts at the next full hour, lasts two hours, clamps to 23:59, and moves to tomorrow after 23:00. Six unit tests (`NewSessionWindowTest`). **Verified:** at 00:09 the form opened with 1:00 AM - 3:00 AM and only the "select an app" requirement left.
+- **Status:** Fixed.
+
+## <a id="b-026"></a>B-026 - Repeat without days
+
+- **Fix:** validation "Pick at least one repeat day" (`noDaysErr`), which disables Save until a day is chosen. **Verified:** error shows with Repeat on and no days; clears after selecting days; Save then enabled.
+- **Status:** Fixed.
+
+## <a id="b-027"></a>B-027 - Theme and consistency fixes
+
+- **Dark theme:** `SessionsScreen` received `isDarkMode` but never passed it to `SessionsMainScreen`/`AppPickerScreen`, so headings used light-mode colours on a black background ("Suggested Sessions" was unreadable). The dark scheme also used the darkest green as `primary` and for the selected tab, text and icons. Fixes: forward the flag; new `fgAccent()` (lighter green on dark); dark `primary`/selected-tab colours; Home "INSIGHT" and "View All" use `fgAccent()`.
+- **Off-palette widgets:** the colour scheme lacked `tertiaryContainer`, `secondaryContainer`, `outline`, so default Material widgets showed purple/pink (AM/PM selector, switch off-state, dividers). The scheme is completed, and one `fgSwitchColors()` is used by every switch.
+- **Time and wording:** one `formatClock`/`timeRangeLabel` that follows the device's 12/24-hour setting (cards showed 24 h while the form showed 12 h, the picker was always 12 h); "1 app blocked" pluralisation; neutral instead of error-red text for the blocked-app count; the Blocked Apps row styled like the other form rows; the selected date's list is titled "Sessions on Sat, Oct 31" instead of always "Today's Sessions"; Blocks shows an empty-state message; Settings shows the real version (`0.5`, was hard-coded `1.0.0`) and an accurate subtitle for the blocking switch (it pauses sessions as well as limits).
+- **Verified:** screenshots on the emulator in light and dark; unit tests for the formatters (`FormattingTest`).
+- **Status:** Fixed.
+
+## UI proposals (not implemented, for review)
+
+Observed while testing the Sessions flow; each is a design choice rather than a defect.
+
+1. **Full-screen create/edit flows.** The bottom navigation stays visible under the form and picker, and the validation list plus Save bar leave only about half the screen for fields. Hide the nav bar in sub-screens, and show errors inline (or only after the first Save tap) instead of listing every missing field on a pristine form.
+2. **One top-bar pattern.** Main tabs use logo + name, the form uses a centred title with a Close icon, the picker a left title with a check. Use *back arrow - title - primary action* everywhere.
+3. **Calendar strip.** Dots under days that have sessions, a "Today" shortcut, and the month label when a week spans two months (the strip shows "1" under "October" today). Keep the selected-day highlight when paging weeks.
+4. **Session cards.** An enable/disable switch and overflow menu (edit, duplicate, delete); an emoji picker (every custom session is currently the stopwatch emoji).
+5. **Active-session card.** Show the end time next to the countdown, label what the ring measures, and make "End break" the only red action.
+6. **Apps and limits.** Allow pre-installed apps in the picker (B-011); in Blocks let users search any installed app instead of only apps already used today.
+7. **Break handling.** Use the session's configured break length on the block screen (B-010).
+8. **Theme hygiene.** `HomeScreen` defines its own private colour constants; move them to the theme so light/dark stay in step, and raise the ring's contrast in dark mode.
+
 ## Fix log
 
 | Date | ID | Commit | Result |
@@ -258,5 +300,7 @@ Concept background is in [ANDROID_CONCEPTS.md](ANDROID_CONCEPTS.md); component c
 | 2026-10-25 | B-023 | `fix: let users delete a saved session from its edit screen` | Fixed (delete); emulator-verified |
 | 2026-10-25 | B-001 | `fix: enable core library desugaring and guard API 23 alarm calls` | Fixed; lint `NewApi` 85 -> 0 |
 | 2026-10-25 | B-008 | `fix: stop blocking the main thread in receivers and cancel the service scope` | Fixed; receiver re-arm verified on emulator |
+| 2026-10-26 | B-025 | `fix: start new sessions in the future` | Fixed; 6 unit tests |
+| 2026-10-26 | B-024, B-026, B-027 | `fix: sessions screen flow and theme consistency` | Fixed; emulator screenshots, 4 formatter tests |
 
-After these changes: `testDebugUnitTest` runs 25 tests (24 new plus the template test), all passing; `lintDebug` reports **1 error** (`MissingSuperCall` in `BlockActivity.onBackPressed`, in a file with uncommitted working-tree edits, left untouched), down from 93.
+After these changes: `testDebugUnitTest` runs 35 tests (34 new plus the template test), all passing; `lintDebug` reports **1 error** (`MissingSuperCall` in `BlockActivity.onBackPressed`, in a file with uncommitted working-tree edits, left untouched), down from 93.

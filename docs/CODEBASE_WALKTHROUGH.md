@@ -36,8 +36,8 @@ Concepts: [permissions](ANDROID_CONCEPTS.md#permissions-and-special-access), [Ac
 `SessionsScreen` -> `SessionsMainScreen` -> FAB "New Session" -> `CreateSessionScreen` ->
 (optionally `AppPickerScreen`) -> Save.
 
-1. `viewModel.blankSession()` returns a `FocusSession` with a random UUID, `fromHour` = current hour,
-   `toHour = (hour + 2) % 24`, one-time date = today, no apps. Alternatively a *suggested session*
+1. `viewModel.blankSession()` returns a `FocusSession` with a random UUID, a window from
+   `defaultNewSessionWindow(now)` (next full hour, two hours long, clamped to 23:59, tomorrow after 23:00), one-time date, no apps. Alternatively a *suggested session*
    (`PREDEFINED_SESSIONS`) becomes a `FocusSession` via `newSessionFromSuggested` (repeat Mon-Fri,
    **no apps selected**).
 2. `CreateSessionScreen` keeps every field in its own `remember { mutableStateOf(...) }`
@@ -45,7 +45,7 @@ Concepts: [permissions](ANDROID_CONCEPTS.md#permissions-and-special-access), [Ac
    come back from `AppPickerScreen` through the parent (`SessionNav.AppPicker` -> `copy(blockedPackages = chosen)`).
 3. **Validation lives only in the composable**:
    `endBeforeStartErr = toMins <= fromMins`, `pastStartErr` (one-time session today whose start has
-   passed), `noAppsErr`, `nameErr`. Save is enabled only when all pass. Consequence: the UI **cannot
+   passed), `noAppsErr`, `nameErr`, `noDaysErr` (Repeat on with no day selected). Save is enabled only when all pass. Consequence: the UI **cannot
    create a session that crosses midnight** ([B-004](BUGS_AND_TECHNICAL_DEBT.md#b-004)), although the
    model, scheduler and service all try to support it.
 4. `SessionsViewModel.saveSession` (in `viewModelScope`): copy the current list from state, replace-or-append
