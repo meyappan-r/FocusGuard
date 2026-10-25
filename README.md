@@ -26,8 +26,6 @@ Everything stays on the device: no account, no analytics, no internet permission
 
 The alarms only re-arm the next occurrence (and are restored after a reboot); whether a session is active is always decided by the clock. Limits are refreshed by a 10-second usage poll, so a limit can trip a few seconds late.
 
-Details, diagrams and trade-offs: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
-
 ## Tech stack
 
 | | |
@@ -51,7 +49,20 @@ git clone https://github.com/meyappan-r/FocusGuard.git
 ./gradlew lintDebug            # lint report: app/build/reports/lint-results-debug.html
 ```
 
-Use a physical device when you can: usage statistics and OEM background restrictions are not realistic on emulators. See [docs/DEBUGGING_AND_TESTING.md](docs/DEBUGGING_AND_TESTING.md) for `adb` recipes and the emulator workflow.
+### Release build
+
+`./gradlew assembleRelease` signs the APK only if a `keystore.properties` file exists in the project root (it is git-ignored, and so are `*.jks` / `*.keystore`):
+
+```properties
+storeFile=C:/path/to/your-upload-key.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+Without that file the release APK is built unsigned. Never commit a keystore or its passwords.
+
+Use a physical device when you can: usage statistics and OEM background restrictions are not realistic on emulators.
 
 After installing, open **Settings** in the app and grant two things:
 
@@ -83,12 +94,6 @@ After installing, open **Settings** in the app and grant two things:
 - **A break does not pause limit-based blocks**, and the session form's break length setting is not used yet.
 - Only one API 36 emulator has been used to test at runtime; behaviour on physical devices and on Android 5–7 is unverified.
 
-The full, prioritised list with evidence is in **[docs/BUGS_AND_TECHNICAL_DEBT.md](docs/BUGS_AND_TECHNICAL_DEBT.md)**.
-
-## Documentation
-
-Start at **[docs/README.md](docs/README.md)**: architecture, a source walkthrough, the Android/Kotlin concepts used, debugging and testing, and the bug list.
-
 ## Roadmap
 
 - [ ] Optional foreground-service fallback for more reliable blocking
@@ -104,4 +109,4 @@ This is a learning project; issues and pull requests are welcome.
 
 ## License
 
-MIT License — © 2026 the-mey
+MIT License — see [LICENSE](LICENSE).
