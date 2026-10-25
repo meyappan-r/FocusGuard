@@ -33,7 +33,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.focusguard.data.local.FocusSession
 import com.focusguard.ui.home.rememberAppIcon
+import com.focusguard.ui.extensions.appsBlockedLabel
+import com.focusguard.ui.extensions.formatClock
+import com.focusguard.ui.extensions.rememberIs24Hour
+import com.focusguard.ui.extensions.timeRangeLabel
 import com.focusguard.ui.theme.FGColors
+import com.focusguard.ui.theme.fgAccent
+import com.focusguard.ui.theme.fgSwitchColors
 import com.focusguard.ui.theme.FG_Error
 import com.focusguard.ui.theme.FG_Seg0
 import com.focusguard.ui.theme.FG_Seg1
@@ -73,6 +79,7 @@ fun SessionsScreen(viewModel: SessionsViewModel, isDarkMode: Boolean = false) {
         is SessionNav.Main -> SessionsMainScreen(
             state    = state,
             viewModel = viewModel,
+            isDarkMode = isDarkMode,
             onCreateNew = {
                 nav = SessionNav.CreateEdit(viewModel.blankSession(), isNew = true)
             },
@@ -99,6 +106,7 @@ fun SessionsScreen(viewModel: SessionsViewModel, isDarkMode: Boolean = false) {
         )
         is SessionNav.AppPicker -> AppPickerScreen(
             allApps         = state.installedApps,
+            isDarkMode      = isDarkMode,
             selectedPackages = current.session.blockedPackages,
             onDone          = { chosen ->
                 val updated = current.session.copy(blockedPackages = chosen)
@@ -124,6 +132,8 @@ fun SessionsMainScreen(
     onEditSession: (FocusSession) -> Unit
 ) {
     val sessionsForDay = viewModel.sessionsForSelectedDate()
+    val sessionsHeader = if (state.selectedDate == LocalDate.now()) "Today's Sessions"
+        else "Sessions on " + state.selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
     val bg    = MaterialTheme.colorScheme.background
     val hdrBg = MaterialTheme.colorScheme.surface
     val txtPri = MaterialTheme.colorScheme.onSurface
@@ -136,7 +146,7 @@ fun SessionsMainScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Shield, contentDescription = null,
-                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
+                            tint = fgAccent(), modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("FocusGuard", fontWeight = FontWeight.Bold,
                             fontSize = 18.sp, color = txtPri)
@@ -183,7 +193,7 @@ fun SessionsMainScreen(
 
             if (sessionsForDay.isNotEmpty()) {
                 item {
-                    Text("Today's Sessions", fontWeight = FontWeight.Bold,
+                    Text(sessionsHeader, fontWeight = FontWeight.Bold,
                         fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 8.dp))
                 }
@@ -288,7 +298,7 @@ fun CalendarWeekStrip(state: SessionsState, viewModel: SessionsViewModel, isDark
                             fontSize = 14.sp,
                             color = when {
                                 isSelected -> Color.White
-                                isToday    -> FG_Seg1
+                                isToday    -> fgAccent()
                                 else       -> txtPri
                             },
                             fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
@@ -332,7 +342,7 @@ fun ActiveSessionCard(
                 Text(emoji, fontSize = 28.sp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Active Session", fontSize = 11.sp, color = FG_Seg1,
+                    Text("Active Session", fontSize = 11.sp, color = fgAccent(),
                         fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
                     Text(name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = txtPri)
                 }
@@ -342,14 +352,14 @@ fun ActiveSessionCard(
                 CircularProgressIndicator(
                     modifier    = Modifier.size(48.dp),
                     strokeWidth = 5.dp,
-                    color       = FG_Seg1,
+                    color       = fgAccent(),
                     trackColor  = MaterialTheme.colorScheme.outlineVariant
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(timeStr, fontWeight = FontWeight.Black,
                         fontSize = 28.sp, color = txtPri)
-                    Text("$blockedCount apps blocked",
+                    Text(appsBlockedLabel(blockedCount),
                         fontSize = 12.sp, color = txtSec)
                 }
             }
@@ -406,13 +416,13 @@ fun SuggestedSessionCard(s: SuggestedSession, isDarkMode: Boolean = false, onAdd
                         modifier = Modifier.size(12.dp), tint = txtSec)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        "%02d:%02d – %02d:%02d".format(s.fromHour, s.fromMinute, s.toHour, s.toMinute),
+                        timeRangeLabel(s.fromHour, s.fromMinute, s.toHour, s.toMinute, rememberIs24Hour()),
                         fontSize = 12.sp, color = txtSec
                     )
                 }
             }
             IconButton(onClick = onAdd) {
-                Icon(Icons.Default.Add, contentDescription = "Add", tint = FG_Seg1)
+                Icon(Icons.Default.Add, contentDescription = "Add", tint = fgAccent())
             }
         }
     }
@@ -451,12 +461,12 @@ fun SavedSessionCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(session.name, fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp, color = txtPri)
-                val timeRange = "%02d:%02d – %02d:%02d".format(
-                    session.fromHour, session.fromMinute, session.toHour, session.toMinute)
+                val timeRange = timeRangeLabel(
+                    session.fromHour, session.fromMinute, session.toHour, session.toMinute, rememberIs24Hour())
                 Text(timeRange, fontSize = 12.sp, color = txtSec)
                 if (session.blockedPackages.isNotEmpty()) {
-                    Text("${session.blockedPackages.size} apps blocked",
-                        fontSize = 11.sp, color = FG_Error)
+                    Text(appsBlockedLabel(session.blockedPackages.size),
+                        fontSize = 11.sp, color = txtSec)
                 }
             }
             
@@ -465,7 +475,7 @@ fun SavedSessionCard(
                 val statusColor: Color
                 if (isActive) {
                     statusText = "Active"
-                    statusColor = FG_Seg1
+                    statusColor = fgAccent()
                 } else {
                     val now = java.time.LocalDateTime.now()
                     val toMs = (session.toHour * 60 + session.toMinute) * 60000L
@@ -554,8 +564,9 @@ fun CreateSessionScreen(
     val pastStartErr = dateIsToday && fromMins < currentMins
     val noAppsErr = blockedPkgs.isEmpty()
     val nameErr = name.isBlank()
+    val noDaysErr = repeatEnabled && repeatDays.isEmpty()
 
-    val isValid = !endBeforeStartErr && !pastStartErr && !noAppsErr && !nameErr
+    val isValid = !endBeforeStartErr && !pastStartErr && !noAppsErr && !nameErr && !noDaysErr
 
     BackHandler {
         if (isDirty) showDiscard = true else onDiscard()
@@ -611,6 +622,7 @@ fun CreateSessionScreen(
     // ── From time picker ──────────────────────────────────────
     if (showFromPicker) {
         TimePickerDialog(
+            is24Hour      = rememberIs24Hour(),
             initialHour   = fromHour,
             initialMinute = fromMinute,
             onConfirm     = { h, m -> fromHour = h; fromMinute = m; showFromPicker = false },
@@ -621,6 +633,7 @@ fun CreateSessionScreen(
     // ── To time picker ────────────────────────────────────────
     if (showToPicker) {
         TimePickerDialog(
+            is24Hour      = rememberIs24Hour(),
             initialHour   = toHour,
             initialMinute = toMinute,
             onConfirm     = { h, m -> toHour = h; toMinute = m; showToPicker = false },
@@ -672,6 +685,7 @@ fun CreateSessionScreen(
                         if (pastStartErr) Text("• Start time must be in the future", color = FG_Error, fontSize = 12.sp)
                         if (endBeforeStartErr) Text("• End time must be after start time", color = FG_Error, fontSize = 12.sp)
                         if (noAppsErr) Text("• Select at least one app to block", color = FG_Error, fontSize = 12.sp)
+                        if (noDaysErr) Text("• Pick at least one repeat day", color = FG_Error, fontSize = 12.sp)
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     Button(
@@ -749,9 +763,7 @@ fun CreateSessionScreen(
                 Column {
                     FormRow(label = "From", onClick = { showFromPicker = true }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("%02d:%02d %s".format(
-                                if (fromHour % 12 == 0) 12 else fromHour % 12, fromMinute,
-                                if (fromHour < 12) "AM" else "PM"),
+                            Text(formatClock(fromHour, fromMinute, rememberIs24Hour()),
                                 style = MaterialTheme.typography.bodyMedium)
                             Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -760,9 +772,7 @@ fun CreateSessionScreen(
                     androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     FormRow(label = "To", onClick = { showToPicker = true }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("%02d:%02d %s".format(
-                                if (toHour % 12 == 0) 12 else toHour % 12, toMinute,
-                                if (toHour < 12) "AM" else "PM"),
+                            Text(formatClock(toHour, toMinute, rememberIs24Hour()),
                                 style = MaterialTheme.typography.bodyMedium)
                             Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -794,7 +804,8 @@ fun CreateSessionScreen(
                         Text("Repeat", style = MaterialTheme.typography.bodyLarge)
                         Switch(
                             checked  = repeatEnabled,
-                            onCheckedChange = { repeatEnabled = it }
+                            onCheckedChange = { repeatEnabled = it },
+                            colors   = fgSwitchColors()
                         )
                     }
 
@@ -852,7 +863,7 @@ fun CreateSessionScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Card(
                 modifier = Modifier.clickable { onPickApps(buildSession()) },
-                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                 shape    = RoundedCornerShape(12.dp)
             ) {
                 Row(
@@ -866,8 +877,9 @@ fun CreateSessionScreen(
                             Text("None", style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
-                            Text("${blockedPkgs.size} apps", style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                            Text(if (blockedPkgs.size == 1) "1 app" else "${blockedPkgs.size} apps",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface)
                         }
                         Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -934,6 +946,9 @@ fun AppPickerScreen(
 ) {
     var chosen  by remember { mutableStateOf(selectedPackages) }
     var query   by remember { mutableStateOf("") }
+
+    // System Back must return to the form; without this it left the whole Sessions tab and lost the draft
+    BackHandler(onBack = onBack)
     var snackMsg by remember { mutableStateOf<String?>(null) }
 
     val bg     = MaterialTheme.colorScheme.background
@@ -961,10 +976,15 @@ fun AppPickerScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Select Apps to Block", fontWeight = FontWeight.Bold, color = txtPri) },
-                navigationIcon = {},
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack,
+                            contentDescription = "Back", tint = fgAccent())
+                    }
+                },
                 actions = {
                     IconButton(onClick = { onDone(chosen) }) {
-                        Icon(Icons.Default.Check, contentDescription = "Done", tint = FG_Seg1)
+                        Icon(Icons.Default.Check, contentDescription = "Done", tint = fgAccent())
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = hdrBg)
@@ -977,12 +997,12 @@ fun AppPickerScreen(
                 value         = query,
                 onValueChange = { query = it },
                 placeholder   = { Text("Search apps", color = txtSec) },
-                leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null, tint = FG_Seg1) },
+                leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null, tint = fgAccent()) },
                 singleLine    = true,
                 shape         = RoundedCornerShape(14.dp),
                 modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 colors        = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor   = FG_Seg1,
+                    focusedBorderColor   = fgAccent(),
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
@@ -1013,7 +1033,7 @@ fun AppPickerScreen(
                                 )
                             } else {
                                 Text(app.appName.take(1).uppercase(),
-                                    fontWeight = FontWeight.Bold, color = FG_Seg1)
+                                    fontWeight = FontWeight.Bold, color = fgAccent())
                             }
                         }
                         Spacer(modifier = Modifier.width(14.dp))
@@ -1032,10 +1052,7 @@ fun AppPickerScreen(
                                 chosen = if (on) chosen + app.packageName else chosen - app.packageName
                                 if (on) snackMsg = "Added to blocked apps"
                             },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor  = FG_Seg1,
-                                checkedTrackColor  = FG_Seg3.copy(alpha = 0.4f)
-                            )
+                            colors = fgSwitchColors()
                         )
                     }
                     HorizontalDivider(color = track, thickness = 0.5.dp,
@@ -1121,12 +1138,13 @@ fun TagPickerSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimePickerDialog(
+    is24Hour:      Boolean,
     initialHour:   Int,
     initialMinute: Int,
     onConfirm:     (Int, Int) -> Unit,
     onDismiss:     () -> Unit
 ) {
-    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute, is24Hour = false)
+    val state = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute, is24Hour = is24Hour)
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(16.dp)) {
             Column(

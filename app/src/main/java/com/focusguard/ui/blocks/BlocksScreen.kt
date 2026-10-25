@@ -30,6 +30,8 @@ import androidx.core.graphics.drawable.toBitmap
 import com.focusguard.ui.home.formatTime
 import com.focusguard.ui.home.rememberAppIcon
 import com.focusguard.ui.theme.FGColors
+import com.focusguard.ui.theme.fgAccent
+import com.focusguard.ui.theme.fgSwitchColors
 import com.focusguard.ui.theme.FG_Error
 import com.focusguard.ui.theme.FG_ErrorLight
 import com.focusguard.ui.theme.FG_HeaderLight
@@ -66,7 +68,7 @@ fun BlocksScreen(viewModel: BlocksViewModel, isDarkMode: Boolean = false) {
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Shield, contentDescription = null,
-                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
+                            tint = fgAccent(), modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("FocusGuard", fontWeight = FontWeight.Bold,
                             fontSize = 18.sp, color = txtPri)
@@ -91,6 +93,16 @@ fun BlocksScreen(viewModel: BlocksViewModel, isDarkMode: Boolean = false) {
             )
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (state.apps.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No app usage recorded yet today. Apps you use will show up here so you can set a daily limit.",
+                            fontSize = 13.sp,
+                            color = txtSec,
+                            modifier = Modifier.padding(vertical = 24.dp)
+                        )
+                    }
+                }
                 items(state.apps) { appState ->
                     BlockAppRow(
                         appState  = appState,
@@ -170,7 +182,7 @@ fun BlockAppRow(
                         )
                     } else {
                         Text(appState.appUsage.appName.take(1).uppercase(),
-                            fontWeight = FontWeight.Bold, color = FG_Seg1, fontSize = 16.sp)
+                            fontWeight = FontWeight.Bold, color = fgAccent(), fontSize = 16.sp)
                     }
                 }
 
@@ -207,10 +219,7 @@ fun BlockAppRow(
                     checked  = isLimited,
                     onCheckedChange = { if (isBlockable) onToggleBlock() },
                     enabled  = isBlockable,
-                    colors   = SwitchDefaults.colors(
-                        checkedThumbColor  = FG_Seg1,
-                        checkedTrackColor  = FG_Seg3.copy(alpha = 0.4f)
-                    )
+                    colors   = fgSwitchColors()
                 )
             }
 
@@ -241,7 +250,7 @@ fun BlockAppRow(
                     Spacer(Modifier.width(12.dp))
                     IconButton(onClick = onEditClick) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit",
-                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
+                            tint = fgAccent(), modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -276,7 +285,7 @@ fun EditLimitDialog(
                     singleLine    = true,
                     suffix        = { Text("min") },
                     colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = FG_Seg1,
+                        focusedBorderColor   = fgAccent(),
                         unfocusedBorderColor = FG_Seg3.copy(alpha = 0.5f)
                     )
                 )
@@ -284,7 +293,7 @@ fun EditLimitDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(limitInput.toLongOrNull() ?: 0L) }) {
-                Text("Save", color = FG_Seg1, fontWeight = FontWeight.Bold)
+                Text("Save", color = fgAccent(), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

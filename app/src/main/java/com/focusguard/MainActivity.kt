@@ -50,6 +50,12 @@ import com.focusguard.ui.theme.FG_Error
 import com.focusguard.ui.theme.FG_Seg0
 import com.focusguard.ui.theme.FG_Seg1
 import com.focusguard.ui.theme.FG_Seg2
+import com.focusguard.ui.theme.FG_Seg3
+import com.focusguard.ui.theme.FG_SegOther
+import com.focusguard.ui.theme.FG_Track
+import com.focusguard.ui.theme.FG_TrackDark
+import com.focusguard.ui.theme.FG_TxtSecDark
+import com.focusguard.ui.theme.FG_TxtSecLight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.NavigationBarItemDefaults
 
@@ -159,9 +165,12 @@ fun FocusGuardApp(
 
     val colorScheme = if (isDarkMode) {
         androidx.compose.material3.darkColorScheme(
-            primary = FG_Seg0, onPrimary = Color.White,
+            primary = FG_Seg3, onPrimary = FG_Seg0,
             primaryContainer = FG_Seg1, onPrimaryContainer = Color.White,
             secondary = FG_Seg2,
+            secondaryContainer = FG_TrackDark, onSecondaryContainer = FG_SegOther,
+            tertiary = FG_Seg3, tertiaryContainer = FG_Seg1, onTertiaryContainer = Color.White,
+            outline = FG_TxtSecDark, outlineVariant = FG_TrackDark,
             background = FGColors.bg(isDarkMode), onBackground = txtPri,
             surface = surf, onSurface = txtPri,
             surfaceVariant = card, onSurfaceVariant = txtSec,
@@ -172,6 +181,9 @@ fun FocusGuardApp(
             primary = FG_Seg0, onPrimary = Color.White,
             primaryContainer = FG_Seg1, onPrimaryContainer = Color.White,
             secondary = FG_Seg2,
+            secondaryContainer = FG_Track, onSecondaryContainer = FG_Seg0,
+            tertiary = FG_Seg3, tertiaryContainer = FG_Track, onTertiaryContainer = FG_Seg0,
+            outline = FG_TxtSecLight, outlineVariant = FG_SegOther,
             background = FGColors.bg(isDarkMode), onBackground = txtPri,
             surface = surf, onSurface = txtPri,
             surfaceVariant = card, onSurfaceVariant = txtSec,
@@ -196,8 +208,8 @@ fun FocusGuardApp(
                             label    = { Text(screen.title) },
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                             colors   = NavigationBarItemDefaults.colors(
-                                selectedIconColor = FG_Seg0,
-                                selectedTextColor = FG_Seg0,
+                                selectedIconColor = if (isDarkMode) FG_SegOther else FG_Seg0,
+                                selectedTextColor = if (isDarkMode) FG_SegOther else FG_Seg0,
                                 indicatorColor    = FG_Seg1.copy(alpha = 0.2f),
                                 unselectedIconColor = txtSec,
                                 unselectedTextColor = txtSec

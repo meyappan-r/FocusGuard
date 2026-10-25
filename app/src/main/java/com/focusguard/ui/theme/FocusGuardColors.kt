@@ -2,7 +2,11 @@ package com.focusguard.ui.theme
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 
 // ── Primary tonal greens ──────────────────────────────────────────
@@ -44,3 +48,15 @@ object FGColors {
     @Composable fun txtSec(dark: Boolean) = animateColorAsState(if (dark) FG_TxtSecDark else FG_TxtSecLight, tween(250)).value
     @Composable fun track(dark: Boolean)  = animateColorAsState(if (dark) FG_TrackDark  else FG_Track, tween(250)).value
 }
+
+/** One switch style for the whole app (Settings, Blocks, Sessions form and app picker). */
+@Composable
+fun fgSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    checkedThumbColor = FG_Seg1,
+    checkedTrackColor = FG_Seg3.copy(alpha = 0.4f)
+)
+
+/** Accent for text and icons: the deep green on light backgrounds, a lighter green on dark ones. */
+@Composable
+fun fgAccent(): Color =
+    if (MaterialTheme.colorScheme.background.luminance() < 0.5f) FG_Seg3 else FG_Seg1

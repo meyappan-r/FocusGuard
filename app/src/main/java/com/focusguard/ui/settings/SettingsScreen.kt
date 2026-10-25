@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusguard.ui.theme.FGColors
+import com.focusguard.ui.theme.fgAccent
+import com.focusguard.ui.theme.fgSwitchColors
 import com.focusguard.ui.theme.FG_Error
 import com.focusguard.ui.theme.FG_Seg0
 import com.focusguard.ui.theme.FG_Seg1
@@ -40,6 +42,9 @@ fun SettingsScreen(
 ) {
     val state   by viewModel.state.collectAsState()
     val context  = LocalContext.current
+    val appVersion = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
+    }
 
     val bg      = FGColors.bg(isDarkMode)
     val hdrBg   = FGColors.header(isDarkMode)
@@ -72,7 +77,7 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text("FocusGuard", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = txtPri)
-                    Text("Version 1.0.0", fontSize = 13.sp, color = txtSec, fontWeight = FontWeight.Medium)
+                    Text("Version $appVersion", fontSize = 13.sp, color = txtSec, fontWeight = FontWeight.Medium)
                     
                     Spacer(Modifier.height(32.dp))
                     
@@ -119,7 +124,7 @@ fun SettingsScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Shield, contentDescription = null,
-                            tint = FG_Seg1, modifier = Modifier.size(20.dp))
+                            tint = fgAccent(), modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("FocusGuard", fontWeight = FontWeight.Bold,
                             fontSize = 18.sp, color = txtPri)
@@ -144,7 +149,7 @@ fun SettingsScreen(
                 SettingsCard(cardBg = cardBg) {
                     PermissionRow(
                         icon      = if (state.hasUsageStatsPermission) Icons.Default.CheckCircle else Icons.Default.Lock,
-                        iconTint  = if (state.hasUsageStatsPermission) FG_Seg1 else FG_Error,
+                        iconTint  = if (state.hasUsageStatsPermission) fgAccent() else FG_Error,
                         title     = "Usage Access",
                         subtitle  = "Required to track screen time.",
                         isGranted = state.hasUsageStatsPermission,
@@ -156,7 +161,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp))
                     PermissionRow(
                         icon      = if (state.hasAccessibilityPermission) Icons.Default.CheckCircle else Icons.Default.Lock,
-                        iconTint  = if (state.hasAccessibilityPermission) FG_Seg1 else FG_Error,
+                        iconTint  = if (state.hasAccessibilityPermission) fgAccent() else FG_Error,
                         title     = "Accessibility Service",
                         subtitle  = "Required to enforce app limits.",
                         isGranted = state.hasAccessibilityPermission,
@@ -175,7 +180,7 @@ fun SettingsScreen(
                     ToggleRow(
                         icon     = Icons.Default.Block,
                         title    = "Enable App Blocking",
-                        subtitle = "Pause all limits temporarily.",
+                        subtitle = "Pause all session and limit blocking.",
                         checked  = state.isBlockingEnabled,
                         txtPri   = txtPri,
                         txtSec   = txtSec,
@@ -205,7 +210,7 @@ fun SettingsScreen(
                     ActionRow(
                         icon     = Icons.Default.Info,
                         title    = "Version",
-                        subtitle = "1.0.0",
+                        subtitle = appVersion,
                         txtPri   = txtPri,
                         txtSec   = txtSec,
                         onClick  = { showVersionDialog = true }
@@ -302,12 +307,12 @@ private fun PermissionRow(
         }
         if (!isGranted) {
             TextButton(onClick = onClick,
-                colors = ButtonDefaults.textButtonColors(contentColor = FG_Seg1)) {
+                colors = ButtonDefaults.textButtonColors(contentColor = fgAccent())) {
                 Text("Grant", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
         } else {
             Text("Granted", fontSize = 12.sp,
-                color = FG_Seg1, fontWeight = FontWeight.Medium)
+                color = fgAccent(), fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -379,7 +384,7 @@ private fun SegmentedThemeSelector(
                         imageVector        = icon,
                         contentDescription = label,
                         modifier           = Modifier.size(15.dp),
-                        tint               = if (isSelected) FG_Seg1 else txtSec
+                        tint               = if (isSelected) fgAccent() else txtSec
                     )
                     Spacer(Modifier.width(5.dp))
                     Text(
@@ -410,7 +415,7 @@ private fun ToggleRow(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = FG_Seg1,
+        Icon(icon, contentDescription = null, tint = fgAccent(),
             modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -421,10 +426,7 @@ private fun ToggleRow(
         Switch(
             checked         = checked,
             onCheckedChange = onToggle,
-            colors          = SwitchDefaults.colors(
-                checkedThumbColor  = FG_Seg1,
-                checkedTrackColor  = FG_Seg3.copy(alpha = 0.4f)
-            )
+            colors          = fgSwitchColors()
         )
     }
 }
@@ -445,7 +447,7 @@ private fun ActionRow(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = FG_Seg1,
+        Icon(icon, contentDescription = null, tint = fgAccent(),
             modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {

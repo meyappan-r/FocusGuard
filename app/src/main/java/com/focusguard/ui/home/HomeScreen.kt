@@ -6,6 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import com.focusguard.ui.theme.fgAccent
 import com.focusguard.ui.extensions.clickableScale
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -305,7 +306,7 @@ private fun TodayContent(
                 text       = if (state.showAll) "Show Less" else "View All",
                 fontSize   = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color      = Seg1,
+                color      = fgAccent(),
                 modifier   = Modifier.clickableScale { onToggleAll() }
             )
         }
@@ -441,7 +442,7 @@ fun PeakDistractionCard(
                         text       = "INSIGHT",
                         fontSize   = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color      = Seg0,
+                        color      = fgAccent(),
                         modifier   = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         letterSpacing = 0.8.sp
                     )
