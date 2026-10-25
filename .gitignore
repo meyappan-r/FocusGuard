@@ -16,3 +16,6 @@ local.properties
 
 LEARN.md
 learn_part*.md
+
+# Personal study material (kept local)
+docs/LEARNING_AND_INTERVIEW_GUIDE.md

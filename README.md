@@ -18,19 +18,20 @@ Existing solutions rely on soft nudges — usage summaries, app timers you can b
 
 FocusGuard uses two Android system privileges — **Accessibility Service** and **AlarmManager exact alarms** — to create a deterministic, automated blocking pipeline:
 
-- Sessions are configured once and scheduled as system alarms.
-- When a session is active, the Accessibility Service detects every foreground app change in real time.
-- Blocked apps are intercepted instantly and replaced with a full-screen block screen.
-- All of this happens without a background polling loop, without a persistent foreground notification, and without draining the battery.
+- Sessions are configured once, stored on-device, and their next occurrences are registered as system alarms.
+- Whether a session is active is decided from the system clock each time an app comes to the foreground.
+- The Accessibility Service detects every foreground app change in real time.
+- Blocked apps are intercepted and replaced with a full-screen block screen.
+- Blocking itself needs no persistent foreground notification. A lightweight 10-second poll refreshes per-app daily-limit status; the exact trade-offs are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
 ## Key Features
 
 - **Scheduled App Blocking** — Define sessions with a start time, end time, repeat days, and a specific list of apps to block.
-- **Automatic Session Execution** — AlarmManager triggers sessions at exact times. No manual start required.
-- **Real-Time Accessibility Enforcement** — Every app switch is intercepted within milliseconds. Zero-latency in-memory blocking.
-- **Break System** — Tap "Take a Break" on the block screen to temporarily unlock for 2, 5, or 10 minutes.
+- **Automatic Session Execution** — Sessions start and end by the clock; no manual start required. (Exact alarms re-arm the next occurrence and are restored after reboot.)
+- **Real-Time Accessibility Enforcement** — Every app switch is evaluated against in-memory caches, so the decision itself does no disk I/O.
+- **Break System** — Tap "Unblock manually" on the block screen to temporarily unlock for a short break.
 - **Screen-Time Tracking** — Tracks true Screen-On Time via a custom event-stream parser, not the inflated `totalTimeInForeground` API.
 - **Peak Distraction Detection** — Identifies and surfaces the single app consuming the most attention today.
 - **Weekly Usage Chart** — Tap any bar in the 7-day chart to see a per-app breakdown for that day.
@@ -49,22 +50,24 @@ FocusGuard uses two Android system privileges — **Accessibility Service** and 
 2. Session is persisted in DataStore (JSON)
         └─ SessionScheduler registers exact AlarmManager alarms for start/end times
 
-3. Device time reaches the session start
-        └─ AlarmManager fires → SessionAlarmReceiver → reschedules next occurrence
+3. Alarms fire at session start/end
+        └─ AlarmManager → SessionAlarmReceiver → re-arms the next occurrence
+        └─ (Enforcement does not depend on the alarm: it is decided by the clock)
 
 4. User opens a blocked app
         └─ BlockerAccessibilityService detects TYPE_WINDOW_STATE_CHANGED event
-        └─ In-memory cache lookup: is this app blocked right now?
+        └─ In-memory cache lookup + current time: is this app blocked right now?
         └─ YES → launches BlockActivity (full-screen block overlay)
 
 5. Block screen is displayed
-        └─ Shows app name, icon, and which session is blocking it
-        └─ Options: Go Home | Take a Break (2/5/10 min)
+        └─ Shows app name, icon, and which session (or limit) is blocking it
+        └─ Options: Exit (go Home) | Unblock manually (temporary break)
 
 6. Session end time is reached
-        └─ AlarmManager fires end alarm → reschedules next occurrence
-        └─ Accessibility engine continues monitoring; no active sessions → no blocks
+        └─ The clock check no longer matches → no further blocks
 ```
+
+See [docs/CODEBASE_WALKTHROUGH.md](docs/CODEBASE_WALKTHROUGH.md) for the real code paths.
 
 ---
 
@@ -162,6 +165,12 @@ app/src/main/java/com/focusguard/
 
 ---
 
+## Documentation
+
+In-depth documentation (architecture, source walkthrough, Android concepts, debugging/testing, and the bug list) is in [docs/](docs/README.md).
+
+---
+
 ## Installation
 
 ```bash
@@ -211,7 +220,8 @@ Neither permission transmits any data outside the device. Both are declared with
 
 - **OEM battery killers** — Xiaomi/MIUI, OnePlus, and some Samsung devices aggressively kill Accessibility Services when the app is not in the foreground. The current mitigation is AlarmManager-based rescheduling and a post-boot notification, but perfect reliability on restricted OEMs is not guaranteed without the user manually whitelisting the app from battery optimization.
 - **Accessibility dependency** — The blocking engine requires the Accessibility Service to be enabled. If the user disables it, blocking silently stops.
-- **Midnight-crossing sessions** — Supported in the blocking logic, but the UI session editor does not visually warn the user when `toHour < fromHour`.
+- **Midnight-crossing sessions** — The data model has wrap-around logic, but the session editor currently rejects an end time that is not after the start time, so such sessions cannot be created.
+- **Known defects** — A prioritized, evidence-based list (e.g. `java.time` use with `minSdk 21`) lives in [docs/BUGS_AND_TECHNICAL_DEBT.md](docs/BUGS_AND_TECHNICAL_DEBT.md).
 - **No widget / quick-tile** — Starting or pausing a session requires opening the app.
 
 ---
