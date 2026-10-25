@@ -1,5 +1,6 @@
 package com.focusguard.ui.settings
 
+import android.annotation.SuppressLint
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
@@ -18,7 +19,12 @@ data class SettingsState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
-class SettingsViewModel(private val context: Context) : ViewModel() {
+class SettingsViewModel(context: Context) : ViewModel() {
+
+    // This ViewModel outlives Activity recreation, so it must never hold an Activity.
+    // Only the application context is kept, which lint cannot tell apart from an Activity.
+    @SuppressLint("StaticFieldLeak")
+    private val context: Context = context.applicationContext
 
     private val _state = MutableStateFlow(SettingsState())
     val state: StateFlow<SettingsState> = _state
